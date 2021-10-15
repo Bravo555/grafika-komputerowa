@@ -1,32 +1,31 @@
-
 #include <GL/gl.h>
 #include <GL/glut.h>
 #include <stdlib.h>
+#include <stdio.h>
 
-/*************************************************************************************/
+const float CARPET_START = -1.0f;
+const float CARPET_END = 1.0f;
+const float DISPERSION_MAX = 0.0;
 
+void setRandomColor() {
+    float r = 1.0f; // (float)(rand() % 101) / 100;
+    float g = 1.0f; // (float)(rand() % 101) / 100;
+    float b = 1.0f; // (float)(rand() % 101) / 100;
 
-// Funkcaja określająca, co ma być rysowane
-// (zawsze wywoływana, gdy trzeba przerysować scenę)
-
-
-const float CARPET_START = -100.0f;
-const float CARPET_END = 100.0f;
+    glColor3f(r, g, b);
+}
 
 void SierpinskiSquareRecurse(float start_x, float start_y, float end_x, float end_y, int levels) {
-    float square_size = (end_x - start_x) / 3;
+    // no checking for aspect ratio in the function
+    // to ensure a proper square is drawn, calling code must ensure aspect ratio = 1
+    float square_size = (end_x - start_x) / 3.0f;
 
-    glColor3f(0.0f, 1.0f, 0.0f);
     if(levels == 0) {
+        // if(end_x - start_x < end_y - start_y) {
+        //     printf("%.12f\n", (end_x - start_x) - (end_y - start_y));
+        // }
 
-        float offset_x = (float)((rand() % 201) - 100) / 500; // [-1; 1]
-        float offset_y = (float)((rand() % 201) - 100) / 500; // [-1; 1]
-
-        start_x = start_x + offset_x;
-        end_x = end_x + offset_x;
-        start_y = start_y + offset_y;
-        end_y = end_y + offset_y;
-
+        setRandomColor();
         glVertex2f(start_x, start_y);
         glVertex2f(end_x, start_y);
         glVertex2f(end_x, end_y);
@@ -38,70 +37,44 @@ void SierpinskiSquareRecurse(float start_x, float start_y, float end_x, float en
         for(int x = 0; x < 3; x++) {
             if(y != 1 || x != 1) {
                 float next_start_x = start_x + square_size * x;
-                float next_start_y = start_y - square_size * y;
+                float next_start_y = start_y + square_size * y;
                 float next_end_x = start_x + square_size * (x+1);
-                float next_end_y = start_y - square_size * (y+1);
+                float next_end_y = start_y + square_size * (y+1);
+                // printf("p1: %.9f %.9f p2:%.9f %.9f\n", next_start_x, next_start_y, next_end_x, next_end_y);
                 SierpinskiSquareRecurse(next_start_x, next_start_y, next_end_x, next_end_y, levels - 1);
             }
         }
     }
 }
 
-void RenderScene(void)
-
-{
+void RenderScene() {
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glBegin(GL_QUADS);                                                 
-        glColor3f(0.0f, 0.0f, 1.0f);
-
-        SierpinskiSquareRecurse(CARPET_START, -CARPET_START, CARPET_END, -CARPET_END, 5);
-
+    glBegin(GL_QUADS);
+        SierpinskiSquareRecurse(CARPET_START, CARPET_START, CARPET_END, CARPET_END, 8);
     glEnd();
 
     glFlush();
 }
 
 /*************************************************************************************/
-
 // Funkcja ustalająca stan renderowania
-
- 
-
-void MyInit(void)
-
-{
-    srand(4);
-
-   glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
-   // Kolor okna wnętrza okna - ustawiono na szary
-
+void MyInit() {
+    srand(4);   // https://xkcd.com/221/
+    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
 }
 
 /*************************************************************************************/
-
 // Funkcja służąca do kontroli zachowania proporcji rysowanych obiektów
 // niezależnie od rozmiarów okna graficznego
-
-
-
-void ChangeSize(GLsizei horizontal, GLsizei vertical)
-
 // Parametry horizontal i vertical (szerokość i wysokość okna) są
 // przekazywane do funkcji za każdym razem, gdy zmieni się rozmiar okna
+void ChangeSize(GLsizei horizontal, GLsizei vertical) {
+    // Deklaracja zmiennej aspectRatio określającej proporcję wymiarów okna
+     GLfloat aspectRatio;
 
-{
-
-     GLfloat AspectRatio;
-
-     // Deklaracja zmiennej AspectRatio określającej proporcję wymiarów okna
-
- 
-
-    if(vertical==0)
     // Zabezpieczenie pzred dzieleniem przez 0
-
-        vertical = 1;
+    vertical = (vertical == 0) ? 1 : vertical;
 
      glViewport(0, 0, horizontal, vertical);
      // Ustawienie wielkościokna okna urządzenia (Viewport)
@@ -113,7 +86,10 @@ void ChangeSize(GLsizei horizontal, GLsizei vertical)
     glLoadIdentity();
     // Określenie przestrzeni ograniczającej
 
-    AspectRatio = (GLfloat)horizontal/(GLfloat)vertical;
+    glScalef(100.0f, 100.0f, 1.0f);
+    glTranslatef(0.5f, 0.5f, 0.0f);
+
+    aspectRatio = (GLfloat)horizontal/(GLfloat)vertical;
     // Wyznaczenie współczynnika proporcji okna
 
     // Gdy okno na ekranie nie jest kwadratem wymagane jest
@@ -121,58 +97,57 @@ void ChangeSize(GLsizei horizontal, GLsizei vertical)
     // Pozwala to zachować właściwe proporcje rysowanego obiektu
     // Do określenia okna obserwatora służy funkcja glOrtho(...)
 
- 
+    float scale_x = 1.0f, scale_y = 1.0f;
 
+    // aka if aspectRatio <= 1
     if(horizontal <= vertical)
+        scale_y = scale_y / aspectRatio;
+    else
+        scale_x = scale_x * aspectRatio;
+    glOrtho(-scale_x, scale_x, scale_y, -scale_y, 1.0, -1.0); 
 
-    glOrtho(-100.0,100.0,-100.0/AspectRatio,100.0/AspectRatio,1.0,-1.0); 
-
-     else
-
-    glOrtho(-100.0*AspectRatio,100.0*AspectRatio,-100.0,100.0,1.0,-1.0); 
-
+    // Określenie układu współrzędnych
     glMatrixMode(GL_MODELVIEW);
-    // Określenie układu współrzędnych     
-
     glLoadIdentity();
-
 }
 
+// void MyKeyboardFunc(unsigned char Key, int x, int y) {
+// switch(Key)
+// {
+//     case ‘w’: glTranslate(0); break;
+//     case ‘a’: MenuHandler(1); break;
+//     case ‘s’: MenuHandler(2); break;
+//     case ‘d’: MenuHandler(2); break;
+// }
+
 /*************************************************************************************/
-
 // Główny punkt wejścia programu. Program działa w trybie konsoli
-
- 
-
 int main(int argc, char** argv) {
     glutInit(&argc, argv);
 
-   glutInitDisplayMode(GLUT_SINGLE | GLUT_RGBA);
-   // Ustawienie trybu wyświetlania
-   // GLUT_SINGLE - pojedynczy bufor wyświetlania
-   // GLUT_RGBA - model kolorów RGB
+    // Ustawienie trybu wyświetlania
+    // GLUT_SINGLE - pojedynczy bufor wyświetlania
+    // GLUT_RGBA - model kolorów RGB
+    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGBA);
 
- 
+    // Utworzenie okna i określenie treści napisu w nagłówku okna
+    glutCreateWindow("Drugi program w OpenGL");
 
-   glutCreateWindow("Drugi program w OpenGL");
-   // Utworzenie okna i określenie treści napisu w nagłówku okna
+    // Określenie, że funkcja RenderScene będzie funkcją zwrotną (callback)
+    // Biblioteka GLUT będzie wywoływała tą funkcję za każdym razem, gdy
+    // trzeba będzie przerysować okno
+    glutDisplayFunc(RenderScene);
 
-   glutDisplayFunc(RenderScene);
-   // Określenie, że funkcja RenderScene będzie funkcją zwrotną (callback)
-   // Biblioteka GLUT będzie wywoływała tą funkcję za każdym razem, gdy
-   // trzeba będzie przerysować okno
+    // take keyboard input
+    // glutKeyboardFunc(MyKeyboardFunc);
+    // Dla aktualnego okna ustala funkcję zwrotną odpowiedzialną za
+    // zmiany rozmiaru okna
+    glutReshapeFunc(ChangeSize);
 
+    // Funkcja MyInit (zdefiniowana powyżej) wykonuje wszelkie 
+    // inicjalizacje konieczneprzed przystąpieniem do renderowania
+    MyInit();
 
-   glutReshapeFunc(ChangeSize);
-   // Dla aktualnego okna ustala funkcję zwrotną odpowiedzialną za
-   // zmiany rozmiaru okna
-
-   MyInit();
-   // Funkcja MyInit (zdefiniowana powyżej) wykonuje wszelkie 
-   // inicjalizacje konieczneprzed przystąpieniem do renderowania
-
-
-   glutMainLoop();
-   // Funkcja uruchamia szkielet biblioteki GLUT
-
+    // Funkcja uruchamia szkielet biblioteki GLUT
+    glutMainLoop();
 }
