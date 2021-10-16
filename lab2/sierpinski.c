@@ -3,9 +3,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-const float CARPET_START = -1.0f;
-const float CARPET_END = 1.0f;
+const float CARPET_START = -100.0f;
+const float CARPET_END = 100.0f;
 const float DISPERSION_MAX = 0.0;
+const int LEVELS = 5;
+// 243 = pow(3, 5) errors with: ""function call must have a constant value in a constant expression""
+const float FRAGMENTS = 243;
 
 void setRandomColor() {
     float r = 1.0f; // (float)(rand() % 101) / 100;
@@ -21,10 +24,6 @@ void SierpinskiSquareRecurse(float start_x, float start_y, float end_x, float en
     float square_size = (end_x - start_x) / 3.0f;
 
     if(levels == 0) {
-        // if(end_x - start_x < end_y - start_y) {
-        //     printf("%.12f\n", (end_x - start_x) - (end_y - start_y));
-        // }
-
         setRandomColor();
         glVertex2f(start_x, start_y);
         glVertex2f(end_x, start_y);
@@ -51,7 +50,7 @@ void RenderScene() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     glBegin(GL_QUADS);
-        SierpinskiSquareRecurse(CARPET_START, CARPET_START, CARPET_END, CARPET_END, 8);
+        SierpinskiSquareRecurse(CARPET_START, CARPET_START, CARPET_END, CARPET_END, LEVELS);
     glEnd();
 
     glFlush();
@@ -71,23 +70,29 @@ void MyInit() {
 // przekazywane do funkcji za każdym razem, gdy zmieni się rozmiar okna
 void ChangeSize(GLsizei horizontal, GLsizei vertical) {
     // Deklaracja zmiennej aspectRatio określającej proporcję wymiarów okna
-     GLfloat aspectRatio;
+    GLfloat aspectRatio;
 
     // Zabezpieczenie pzred dzieleniem przez 0
     vertical = (vertical == 0) ? 1 : vertical;
 
-     glViewport(0, 0, horizontal, vertical);
-     // Ustawienie wielkościokna okna urządzenia (Viewport)
-     // W tym przypadku od (0,0) do (horizontal, vertical)
+    printf("fragment size: %f\n", FRAGMENTS);
+    printf("viewport before: %d %d\n", horizontal, vertical);
 
-    glMatrixMode(GL_PROJECTION); 
+    int numHoz = horizontal / FRAGMENTS;
+    int numVer = vertical / FRAGMENTS;
+    horizontal = numHoz * FRAGMENTS;
+    vertical = numVer * FRAGMENTS;
+    printf("viewport after: %d %d\n", horizontal, vertical);
+
+    glViewport(0, 0, horizontal, vertical);
+    // Ustawienie wielkościokna okna urządzenia (Viewport)
+    // W tym przypadku od (0,0) do (horizontal, vertical)
+
+    glMatrixMode(GL_PROJECTION);
     // Określenie układu współrzędnych obserwatora
 
     glLoadIdentity();
     // Określenie przestrzeni ograniczającej
-
-    glScalef(100.0f, 100.0f, 1.0f);
-    glTranslatef(0.5f, 0.5f, 0.0f);
 
     aspectRatio = (GLfloat)horizontal/(GLfloat)vertical;
     // Wyznaczenie współczynnika proporcji okna
@@ -97,14 +102,14 @@ void ChangeSize(GLsizei horizontal, GLsizei vertical) {
     // Pozwala to zachować właściwe proporcje rysowanego obiektu
     // Do określenia okna obserwatora służy funkcja glOrtho(...)
 
-    float scale_x = 1.0f, scale_y = 1.0f;
+    float scale_x = 100.0f, scale_y = 100.0f;
 
     // aka if aspectRatio <= 1
     if(horizontal <= vertical)
         scale_y = scale_y / aspectRatio;
     else
         scale_x = scale_x * aspectRatio;
-    glOrtho(-scale_x, scale_x, scale_y, -scale_y, 1.0, -1.0); 
+    glOrtho(-scale_x, scale_x, scale_y, -scale_y, 1.0, -1.0);
 
     // Określenie układu współrzędnych
     glMatrixMode(GL_MODELVIEW);
