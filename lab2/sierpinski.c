@@ -6,14 +6,19 @@
 const float CARPET_START = -100.0f;
 const float CARPET_END = 100.0f;
 const float DISPERSION_MAX = 0.0;
-const int LEVELS = 5;
-// 243 = pow(3, 5) errors with: ""function call must have a constant value in a constant expression""
-const float FRAGMENTS = 243;
+const int LEVELS = 8;
+
+// The viewport has to be a multiple of this variable in both axes. this effectively dictates how closely the squares
+// are aligned against the individual pixels: 1 - there is no alignment, 3^LEVEL - each square has to be at least 1
+// pixel in size. For high values of LEVEL, squares have to be smaller than a pixel, thus a smaller value than 3^LEVEL
+// is required. So, the value of this variable should be 3^N, where N is level up to which align the squares.
+// 243 = pow(3, LEVELS) errors with: ""function call must have a constant value in a constant expression""
+const int FRAGMENTS = 27;
 
 void setRandomColor() {
-    float r = 1.0f; // (float)(rand() % 101) / 100;
-    float g = 1.0f; // (float)(rand() % 101) / 100;
-    float b = 1.0f; // (float)(rand() % 101) / 100;
+    float r = 1.0f;
+    float g = 1.0f;
+    float b = 1.0f;
 
     glColor3f(r, g, b);
 }
@@ -24,6 +29,14 @@ void SierpinskiSquareRecurse(float start_x, float start_y, float end_x, float en
     float square_size = (end_x - start_x) / 3.0f;
 
     if(levels == 0) {
+        float offset_x = (float)(rand() - (RAND_MAX / 2)) / RAND_MAX * DISPERSION_MAX; // [-1; 1]
+        float offset_y = (float)(rand() - (RAND_MAX / 2)) / RAND_MAX * DISPERSION_MAX; // [-1; 1]
+
+        start_x = start_x + offset_x;
+        end_x = end_x + offset_x;
+        start_y = start_y + offset_y;
+        end_y = end_y + offset_y;
+
         setRandomColor();
         glVertex2f(start_x, start_y);
         glVertex2f(end_x, start_y);
@@ -60,7 +73,7 @@ void RenderScene() {
 // Funkcja ustalająca stan renderowania
 void MyInit() {
     srand(4);   // https://xkcd.com/221/
-    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 /*************************************************************************************/
@@ -73,19 +86,30 @@ void ChangeSize(GLsizei horizontal, GLsizei vertical) {
     GLfloat aspectRatio;
 
     // Zabezpieczenie pzred dzieleniem przez 0
-    vertical = (vertical == 0) ? 1 : vertical;
+    if(vertical == 0) return;
+    // vertical = (vertical == 0) ? 1 : vertical;
 
-    printf("fragment size: %f\n", FRAGMENTS);
+    printf("fragment size: %d\n", FRAGMENTS);
     printf("viewport before: %d %d\n", horizontal, vertical);
 
-    int numHoz = horizontal / FRAGMENTS;
-    int numVer = vertical / FRAGMENTS;
-    horizontal = numHoz * FRAGMENTS;
-    vertical = numVer * FRAGMENTS;
-    printf("viewport after: %d %d\n", horizontal, vertical);
+    // round to the nearest multiple of FRAGMENTS
+    int width = horizontal / FRAGMENTS * FRAGMENTS;
+    int height = vertical / FRAGMENTS * FRAGMENTS;
 
-    glViewport(0, 0, horizontal, vertical);
-    // Ustawienie wielkościokna okna urządzenia (Viewport)
+    int hozOff = 0, verOff = 0;
+    if(vertical < horizontal) {
+        width = height;
+    } else if(horizontal < vertical) {
+        height = width;
+    }
+    hozOff = (horizontal - width) / 2;
+    verOff = (vertical - height) / 2;
+    glViewport(hozOff, verOff, width, height);
+    printf("offset: %d %d\n", hozOff, verOff);
+    printf("viewport after: %d %d\n", width, height);
+
+    // glViewport(0, 0, horizontal, vertical);
+    // Ustawienie wielkości okna okna urządzenia (Viewport)
     // W tym przypadku od (0,0) do (horizontal, vertical)
 
     glMatrixMode(GL_PROJECTION);
@@ -94,7 +118,7 @@ void ChangeSize(GLsizei horizontal, GLsizei vertical) {
     glLoadIdentity();
     // Określenie przestrzeni ograniczającej
 
-    aspectRatio = (GLfloat)horizontal/(GLfloat)vertical;
+    // aspectRatio = (GLfloat)horizontal/(GLfloat)vertical;
     // Wyznaczenie współczynnika proporcji okna
 
     // Gdy okno na ekranie nie jest kwadratem wymagane jest
@@ -105,10 +129,10 @@ void ChangeSize(GLsizei horizontal, GLsizei vertical) {
     float scale_x = 100.0f, scale_y = 100.0f;
 
     // aka if aspectRatio <= 1
-    if(horizontal <= vertical)
-        scale_y = scale_y / aspectRatio;
-    else
-        scale_x = scale_x * aspectRatio;
+    // if(horizontal <= vertical)
+    //     scale_y = scale_y / aspectRatio;
+    // else
+    //     scale_x = scale_x * aspectRatio;
     glOrtho(-scale_x, scale_x, scale_y, -scale_y, 1.0, -1.0);
 
     // Określenie układu współrzędnych
