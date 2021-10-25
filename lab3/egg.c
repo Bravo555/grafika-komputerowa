@@ -58,7 +58,59 @@ void Axes(void)
 
 }
 
+void drawEgg(int n) {
+    point3 points[n][n];
+    float step = 1.0f / n;
 
+    for(int i = 0; i < n; ++i) {
+        float u = i * step;
+        for(int j = 0; j < n; ++j) {
+            float u_step = u;
+            float x = 0.0f, y = 0.0f, z = 0.0f;
+
+            x -= 45.0f * u_step;
+            z -= 45.0f * u_step;
+
+            // u^2
+            u_step *= u;
+            x += 180.0f * u_step;
+            y += 160.0f * u_step;
+            z += 180.0f * u_step;
+
+            // u^3
+            u_step *= u;
+            x -= 270.0f * u_step;
+            y -= 320.0f * u_step;
+            z -= 270.0f * u_step;
+
+            // u^4
+            u_step *= u;
+            x += 225.0f * u_step;
+            y += 160.0f * u_step;
+            z += 225.0f * u_step;
+
+            // u^5
+            u_step *= u;
+            x -= 90.0f * u_step;
+            z -= 90.0f * u_step;
+
+            points[i][j][0] = x;
+            points[i][j][1] = y;
+            points[i][j][2] = z;
+
+        }
+    }
+
+    glBegin(GL_POINTS);
+
+        for(int i = 0; i < n; ++i) {
+            for(int j = 0; j < n; ++j) {
+                glVertex3fv(points[i][j]);
+            }
+        }
+
+    glEnd();
+}
 
 /*************************************************************************************/
 
