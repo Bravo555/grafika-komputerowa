@@ -7,6 +7,7 @@
 
 #include <GL/gl.h>
 #include <GL/glut.h>
+#include <math.h>
 
 
 typedef float point3[3];
@@ -65,6 +66,7 @@ void drawEgg(int n) {
     for(int i = 0; i < n; ++i) {
         float u = i * step;
         for(int j = 0; j < n; ++j) {
+            float v = j * step;
             float u_step = u;
             float x = 0.0f, y = 0.0f, z = 0.0f;
 
@@ -93,6 +95,9 @@ void drawEgg(int n) {
             u_step *= u;
             x -= 90.0f * u_step;
             z -= 90.0f * u_step;
+
+            x *= cos(M_PI * v);
+            z *= sin(M_PI * v);
 
             points[i][j][0] = x;
             points[i][j][1] = y;
@@ -134,6 +139,7 @@ void RenderScene(void)
     glRotated(60.0, 1.0, 1.0, 1.0 );
 
     glColor3f(1.0f, 1.0f, 1.0f);
+    drawEgg(100);
 
     glFlush();
     // Przekazanie poleceń rysujących do wykonania
