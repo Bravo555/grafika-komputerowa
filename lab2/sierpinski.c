@@ -3,14 +3,22 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-const float CARPET_START = -1.0f;
-const float CARPET_END = 1.0f;
-const float DISPERSION_MAX = 0.0;
+const float CARPET_START = -100.0f;
+const float CARPET_END = 100.0f;
+const float DISPERSION_MAX = 0.5;
+const int LEVELS = 3;
+
+// The viewport has to be a multiple of this variable in both axes. this effectively dictates how closely the squares
+// are aligned against the individual pixels: 1 - there is no alignment, 3^LEVEL - each square has to be at least 1
+// pixel in size. For high values of LEVEL, squares have to be smaller than a pixel, thus a smaller value than 3^LEVEL
+// is required. So, the value of this variable should be 3^N, where N is level up to which align the squares.
+// 243 = pow(3, LEVELS) errors with: ""function call must have a constant value in a constant expression""
+const int FRAGMENTS = 27;
 
 void setRandomColor() {
-    float r = 1.0f; // (float)(rand() % 101) / 100;
-    float g = 1.0f; // (float)(rand() % 101) / 100;
-    float b = 1.0f; // (float)(rand() % 101) / 100;
+    float r = (float)rand() / RAND_MAX;
+    float g = (float)rand() / RAND_MAX;
+    float b = (float)rand() / RAND_MAX;
 
     glColor3f(r, g, b);
 }
@@ -21,14 +29,21 @@ void SierpinskiSquareRecurse(float start_x, float start_y, float end_x, float en
     float square_size = (end_x - start_x) / 3.0f;
 
     if(levels == 0) {
-        // if(end_x - start_x < end_y - start_y) {
-        //     printf("%.12f\n", (end_x - start_x) - (end_y - start_y));
-        // }
+        float offset_x = (float)(rand() - (RAND_MAX / 2)) / RAND_MAX * DISPERSION_MAX; // [-1; 1]
+        float offset_y = (float)(rand() - (RAND_MAX / 2)) / RAND_MAX * DISPERSION_MAX; // [-1; 1]
+
+        start_x = start_x + offset_x;
+        end_x = end_x + offset_x;
+        start_y = start_y + offset_y;
+        end_y = end_y + offset_y;
 
         setRandomColor();
         glVertex2f(start_x, start_y);
+        setRandomColor();
         glVertex2f(end_x, start_y);
+        setRandomColor();
         glVertex2f(end_x, end_y);
+        setRandomColor();
         glVertex2f(start_x, end_y);
         return;
     }
@@ -40,7 +55,6 @@ void SierpinskiSquareRecurse(float start_x, float start_y, float end_x, float en
                 float next_start_y = start_y + square_size * y;
                 float next_end_x = start_x + square_size * (x+1);
                 float next_end_y = start_y + square_size * (y+1);
-                // printf("p1: %.9f %.9f p2:%.9f %.9f\n", next_start_x, next_start_y, next_end_x, next_end_y);
                 SierpinskiSquareRecurse(next_start_x, next_start_y, next_end_x, next_end_y, levels - 1);
             }
         }
@@ -51,17 +65,15 @@ void RenderScene() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     glBegin(GL_QUADS);
-        SierpinskiSquareRecurse(CARPET_START, CARPET_START, CARPET_END, CARPET_END, 8);
+        SierpinskiSquareRecurse(CARPET_START, CARPET_START, CARPET_END, CARPET_END, LEVELS);
     glEnd();
 
     glFlush();
 }
 
-/*************************************************************************************/
-// Funkcja ustalająca stan renderowania
 void MyInit() {
     srand(4);   // https://xkcd.com/221/
-    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 /*************************************************************************************/
@@ -70,26 +82,33 @@ void MyInit() {
 // Parametry horizontal i vertical (szerokość i wysokość okna) są
 // przekazywane do funkcji za każdym razem, gdy zmieni się rozmiar okna
 void ChangeSize(GLsizei horizontal, GLsizei vertical) {
-    // Deklaracja zmiennej aspectRatio określającej proporcję wymiarów okna
-     GLfloat aspectRatio;
-
     // Zabezpieczenie pzred dzieleniem przez 0
-    vertical = (vertical == 0) ? 1 : vertical;
+    if(vertical == 0) return;
 
-     glViewport(0, 0, horizontal, vertical);
-     // Ustawienie wielkościokna okna urządzenia (Viewport)
-     // W tym przypadku od (0,0) do (horizontal, vertical)
+    // round to the nearest multiple of FRAGMENTS
+    int width = horizontal / FRAGMENTS * FRAGMENTS;
+    int height = vertical / FRAGMENTS * FRAGMENTS;
 
-    glMatrixMode(GL_PROJECTION); 
+    int hozOff = 0, verOff = 0;
+    if(vertical < horizontal) {
+        width = height;
+    } else if(horizontal < vertical) {
+        height = width;
+    }
+    hozOff = (horizontal - width) / 2;
+    verOff = (vertical - height) / 2;
+
+    // Ustawienie wielkości okna okna urządzenia (Viewport)
+    // W tym przypadku od (0,0) do (horizontal, vertical)
+    glViewport(hozOff, verOff, width, height);
+
     // Określenie układu współrzędnych obserwatora
+    glMatrixMode(GL_PROJECTION);
 
     glLoadIdentity();
     // Określenie przestrzeni ograniczającej
 
-    glScalef(100.0f, 100.0f, 1.0f);
-    glTranslatef(0.5f, 0.5f, 0.0f);
-
-    aspectRatio = (GLfloat)horizontal/(GLfloat)vertical;
+    // aspectRatio = (GLfloat)horizontal/(GLfloat)vertical;
     // Wyznaczenie współczynnika proporcji okna
 
     // Gdy okno na ekranie nie jest kwadratem wymagane jest
@@ -97,31 +116,14 @@ void ChangeSize(GLsizei horizontal, GLsizei vertical) {
     // Pozwala to zachować właściwe proporcje rysowanego obiektu
     // Do określenia okna obserwatora służy funkcja glOrtho(...)
 
-    float scale_x = 1.0f, scale_y = 1.0f;
-
-    // aka if aspectRatio <= 1
-    if(horizontal <= vertical)
-        scale_y = scale_y / aspectRatio;
-    else
-        scale_x = scale_x * aspectRatio;
-    glOrtho(-scale_x, scale_x, scale_y, -scale_y, 1.0, -1.0); 
+    float scale_x = 100.0f, scale_y = 100.0f;
+    glOrtho(-scale_x, scale_x, scale_y, -scale_y, 1.0, -1.0);
 
     // Określenie układu współrzędnych
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 }
 
-// void MyKeyboardFunc(unsigned char Key, int x, int y) {
-// switch(Key)
-// {
-//     case ‘w’: glTranslate(0); break;
-//     case ‘a’: MenuHandler(1); break;
-//     case ‘s’: MenuHandler(2); break;
-//     case ‘d’: MenuHandler(2); break;
-// }
-
-/*************************************************************************************/
-// Główny punkt wejścia programu. Program działa w trybie konsoli
 int main(int argc, char** argv) {
     glutInit(&argc, argv);
 
@@ -131,7 +133,7 @@ int main(int argc, char** argv) {
     glutInitDisplayMode(GLUT_SINGLE | GLUT_RGBA);
 
     // Utworzenie okna i określenie treści napisu w nagłówku okna
-    glutCreateWindow("Drugi program w OpenGL");
+    glutCreateWindow("Dywan Sierpinskiego");
 
     // Określenie, że funkcja RenderScene będzie funkcją zwrotną (callback)
     // Biblioteka GLUT będzie wywoływała tą funkcję za każdym razem, gdy
