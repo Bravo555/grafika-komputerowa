@@ -9,18 +9,34 @@
 #include <GL/glut.h>
 #include <math.h>
 
+#define N 20
 
 typedef float point3[3];
+point3 points[N][N];
+static GLfloat theta[] = {0.0, 0.0, 0.0}; // trzy kąty obrotu
+
+int model = 1;
+
 
 /*************************************************************************************/
 
 // Funkcja rysująca osie układu współrzędnych
 
- 
+void spinEgg() {
 
-void Axes(void)
-{
+    theta[0] -= 0.5;
+    if( theta[0] > 360.0 ) theta[0] -= 360.0;
 
+    theta[1] -= 0.5;
+    if( theta[1] > 360.0 ) theta[1] -= 360.0;
+
+    theta[2] -= 0.5;
+    if( theta[2] > 360.0 ) theta[2] -= 360.0;
+
+    glutPostRedisplay(); //odświeżenie zawartości aktualnego okna
+} 
+
+void Axes() {
     point3  x_min = {-5.0, 0.0, 0.0};
     point3  x_max = { 5.0, 0.0, 0.0};
     // początek i koniec obrazu osi x
@@ -59,8 +75,61 @@ void Axes(void)
 
 }
 
-void drawEgg(int n) {
-    point3 points[n][n];
+void drawEggPoints(int n) {
+    glBegin(GL_POINTS);
+        for(int i = 0; i < n; ++i) {
+            for(int j = 0; j < n; ++j) {
+                glVertex3fv(points[i][j]);
+            }
+        }
+    glEnd();
+}
+
+void drawEggLines(int n) {
+    glBegin(GL_LINES);
+        for(int i = 0; i < n; ++i) {
+            for(int j = 0; j < n-1; ++j) {
+                glVertex3fv(points[i][j]);
+                glVertex3fv(points[i][(j+1)]);
+
+                // TODO: simplify this
+                glVertex3fv(points[i][j]);
+                glVertex3fv(points[(i+1)%n][j]);
+                glVertex3fv(points[i][j+1]);
+                glVertex3fv(points[(i+1)%n][j+1]);
+
+                glVertex3fv(points[i][j]);
+                glVertex3fv(points[(i+1)%n][(j+1)%n]);
+
+                glVertex3fv(points[i][(j+1)%n]);
+                glVertex3fv(points[(i+1)%n][(j+2)%n]);
+            }
+            glVertex3fv(points[i][0]);
+            glVertex3fv(points[(i+1)%n][0]);
+        }
+
+        // connect opposite sides of the egg
+        for(int i = 0; i < n/2; ++i) {
+            glVertex3fv(points[(n/2)-i][n-1]);
+            glVertex3fv(points[(n/2)+i][0]);
+
+            glVertex3fv(points[(n/2)-i][0]);
+            glVertex3fv(points[(n/2)+i][n-1]);
+        }
+    glEnd();
+}
+
+void drawEggTriangles(int n) {
+    glBegin(GL_TRIANGLES);
+        for(int i = 0; i < n; ++i) {
+            for(int j = 0; j < n; ++j) {
+                glVertex3fv(points[i][j]);
+            }
+        }
+    glEnd();
+}
+
+void generateEggVertices(int n) {
     float step = 1.0f / n;
 
     for(int i = 0; i < n; ++i) {
@@ -105,16 +174,6 @@ void drawEgg(int n) {
 
         }
     }
-
-    glBegin(GL_POINTS);
-
-        for(int i = 0; i < n; ++i) {
-            for(int j = 0; j < n; ++j) {
-                glVertex3fv(points[i][j]);
-            }
-        }
-
-    glEnd();
 }
 
 /*************************************************************************************/
@@ -126,8 +185,7 @@ void drawEgg(int n) {
 
 void RenderScene(void)
 {
-
-     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     // Czyszczenie okna aktualnym kolorem czyszczącym
 
     glLoadIdentity();
@@ -136,10 +194,16 @@ void RenderScene(void)
     Axes();
     // Narysowanie osi przy pomocy funkcji zdefiniowanej wyżej
 
-    glRotated(60.0, 1.0, 1.0, 1.0 );
+    glTranslatef(0.0f, -5.0f, 0.0f);
+    glRotatef(35.0f, 1.0f, 0.0f, 0.0f);
+
+    glRotatef(theta[0], 1.0, 0.0, 0.0);
+    glRotatef(theta[1], 0.0, 1.0, 0.0);
+    glRotatef(theta[2], 0.0, 0.0, 1.0);
 
     glColor3f(1.0f, 1.0f, 1.0f);
-    drawEgg(100);
+    if(model == 1) drawEggPoints(N);
+    else if(model ==2) drawEggLines(N);
 
     glFlush();
     // Przekazanie poleceń rysujących do wykonania
@@ -219,6 +283,15 @@ void ChangeSize(GLsizei horizontal, GLsizei vertical )
 
 }
 
+void keys(unsigned char key, int x, int y)
+{
+    if(key == 'p') model = 1;
+    if(key == 'w') model = 2;
+    if(key == 's') model = 3;
+   
+    RenderScene(); // przerysowanie obrazu sceny
+}
+
 /*************************************************************************************/
 
 // Główny punkt wejścia programu. Program działa w trybie konsoli
@@ -234,6 +307,8 @@ int main(int argc, char** argv)
     glutInitWindowSize(300, 300);
 
     glutCreateWindow("Układ współrzędnych 3-D");
+
+    generateEggVertices(N);
                   
     glutDisplayFunc(RenderScene);
     // Określenie, że funkcja RenderScene będzie funkcją zwrotną
@@ -250,6 +325,9 @@ int main(int argc, char** argv)
 
     glEnable(GL_DEPTH_TEST);
     // Włączenie mechanizmu usuwania powierzchni niewidocznych
+
+    glutIdleFunc(spinEgg);
+    glutKeyboardFunc(keys);
 
     glutMainLoop();
     // Funkcja uruchamia szkielet biblioteki GLUT
