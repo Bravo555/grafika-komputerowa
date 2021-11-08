@@ -8,6 +8,7 @@
 #include <GL/gl.h>
 #include <GL/glut.h>
 #include <math.h>
+#include <stdio.h>
 
 #define N 20
 
@@ -16,14 +17,14 @@ point3 points[N][N];
 
 int model = 1;
 
-static GLfloat viewer[]= {0.0, 0.0, 10.0};
+static float viewer[]= {0.0, 0.0, 10.0};
 // inicjalizacja położenia obserwatora
 
 /*************************************************************************************/
 
 // Funkcja rysująca osie układu wspó?rz?dnych
 
-static GLfloat theta = 0.0;   // kąt obrotu obiektu
+static float theta = 0.0;   // kąt obrotu obiektu
 static float theta2 = 0.0;
 static float zstep = 0.1;
 
@@ -211,13 +212,13 @@ void generateEggVertices(int n) {
     }
 }
 
-/*************************************************************************************/
+double clamp(double d, double min, double max) {
+  const double t = d < min ? min : d;
+  return t > max ? max : t;
+}
 
 // Funkcja określająca co ma być rysowane (zawsze wywoływana gdy trzeba
 // przerysować scenę)
-
- 
-
 void RenderScene(void)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -232,17 +233,23 @@ void RenderScene(void)
     Axes();
     // Narysowanie osi przy pomocy funkcji zdefiniowanej wyżej
 
-    if(status == 1) {                   // jeśli lewy klawisz myszy wcięnięty
-        theta += delta_x * pix2angle;    // modyfikacja kąta obrotu o kat proporcjonalny
-        theta2 += delta_y * pix2angle;
-    }                                  // do różnicy położeń kursora myszy
 
+    if(status == 1) {
+        theta = fmod((theta + delta_x * 0.05), 2 * M_PI);
+        theta2 = fmod((theta2 + delta_y * 0.05), 2 * M_PI);
+        printf("theta:%f, theta2: %f\n", theta, theta2);
+        printf("x: %f, y: %f, z: %f\n", viewer[0], viewer[1], viewer[2]);
+    }
     if(status == 2) {
         viewer[2] += delta_y * zstep;
     }
 
-    glRotatef(theta, 0.0, 1.0, 0.0);  //obrót obiektu o nowy kąt
-    glRotatef(theta2, 1.0, 0.0, 0.0);  // rotuj w osi x
+    float r = 10.0;
+
+    viewer[0] = r * cos(theta) * cos(theta2);
+    viewer[1] = r * sin(theta2);
+    viewer[2] = r * sin(theta) * cos(theta2);
+
     glTranslatef(0.0f, -5.0f, 0.0f);
 
 
@@ -250,15 +257,13 @@ void RenderScene(void)
     if(model == 1) drawEggPoints(N);
     else if(model ==2) drawEggLines(N);
 
+
     glFlush();
     // Przekazanie poleceń rysujących do wykonania
-
  
 
     glutSwapBuffers();
-    //
-
- }
+}
 
 /*************************************************************************************/
 
@@ -268,10 +273,8 @@ void RenderScene(void)
 
 void MyInit(void)
 {
-
-glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-// Kolor czyszcący (wypełnienia okna) ustawiono na czarny
-
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    // Kolor czyszcący (wypełnienia okna) ustawiono na czarny
 }
 
 /*************************************************************************************/
@@ -337,7 +340,6 @@ int main(int argc, char** argv)
     glutCreateWindow("Układ współrzędnych 3-D");
 
     generateEggVertices(N);
-                  
     glutDisplayFunc(RenderScene);
     // Określenie, że funkcja RenderScene będzie funkcją zwrotną
     // (callback function).  Bedzie ona wywoływana za każdym razem
