@@ -1,40 +1,47 @@
 /*************************************************************************************/
-
 //  Szkielet programu do tworzenia modelu sceny 3-D z wizualizacją osi 
 //  układu współrzednych
-
 /*************************************************************************************/
 
 #include <GL/gl.h>
 #include <GL/glut.h>
 #include <math.h>
+#include <stdbool.h>
+#include <stdio.h>
 
-#define N 20
+#define N 30
 
 typedef float point3[3];
 point3 points[N][N];
+point3 colours[N][N];
 static GLfloat theta[] = {0.0, 0.0, 0.0}; // trzy kąty obrotu
 
 int model = 1;
+bool rotate = true;
 
-
-/*************************************************************************************/
 
 // Funkcja rysująca osie układu współrzędnych
-
 void spinEgg() {
+    if(!rotate) {
+        return;
+    }
 
-    theta[0] -= 0.5;
+    theta[0] -= 0.2;
     if( theta[0] > 360.0 ) theta[0] -= 360.0;
 
-    theta[1] -= 0.5;
+    theta[1] -= 0.2;
     if( theta[1] > 360.0 ) theta[1] -= 360.0;
 
-    theta[2] -= 0.5;
+    theta[2] -= 0.2;
     if( theta[2] > 360.0 ) theta[2] -= 360.0;
 
     glutPostRedisplay(); //odświeżenie zawartości aktualnego okna
-} 
+}
+
+void drawColoured(int u, int v) {
+    glColor3fv(colours[u][v]);
+    glVertex3fv(points[u][v]);
+}
 
 void Axes() {
     point3  x_min = {-5.0, 0.0, 0.0};
@@ -49,28 +56,18 @@ void Axes() {
     point3  z_max = {0.0, 0.0,  5.0};
     //  początek i koniec obrazu osi y
 
-    glColor3f(1.0f, 0.0f, 0.0f);  // kolor rysowania osi - czerwony
     glBegin(GL_LINES); // rysowanie osi x
-
+        glColor3f(1.0f, 0.0f, 0.0f);  // kolor rysowania osi - czerwony
         glVertex3fv(x_min);
         glVertex3fv(x_max);
 
-    glEnd();
-
-    glColor3f(0.0f, 1.0f, 0.0f);  // kolor rysowania - zielony
-    glBegin(GL_LINES);  // rysowanie osi y
-
+        glColor3f(0.0f, 1.0f, 0.0f);  // kolor rysowania - zielony
         glVertex3fv(y_min);
-        glVertex3fv(y_max);                           
+        glVertex3fv(y_max);
 
-    glEnd();
-
-    glColor3f(0.0f, 0.0f, 1.0f);  // kolor rysowania - niebieski
-    glBegin(GL_LINES); // rysowanie osi z
-
+        glColor3f(0.0f, 0.0f, 1.0f);  // kolor rysowania - niebieski
         glVertex3fv(z_min);
         glVertex3fv(z_max);
-
     glEnd();
 
 }
@@ -97,34 +94,74 @@ void drawEggLines(int n) {
                 glVertex3fv(points[(i+1)%n][j]);
                 glVertex3fv(points[i][j+1]);
                 glVertex3fv(points[(i+1)%n][j+1]);
+            }
+        }
 
+        // draw diagonals
+        for(int i = 0; i < n/2; ++i) {
+            for(int j = 0; j < n-1; ++j) {
                 glVertex3fv(points[i][j]);
                 glVertex3fv(points[(i+1)%n][(j+1)%n]);
-
-                glVertex3fv(points[i][(j+1)%n]);
-                glVertex3fv(points[(i+1)%n][(j+2)%n]);
             }
-            glVertex3fv(points[i][0]);
-            glVertex3fv(points[(i+1)%n][0]);
+        }
+        for(int i = n/2; i < n; ++i) {
+            for(int j = 1; j < n; ++j) {
+                glVertex3fv(points[i][j]);
+                glVertex3fv(points[(i+1)%n][(j-1)%n]);
+            }
         }
 
         // connect opposite sides of the egg
-        for(int i = 0; i < n/2; ++i) {
+        for(int i = 1; i < n/2; ++i) {
             glVertex3fv(points[(n/2)-i][n-1]);
             glVertex3fv(points[(n/2)+i][0]);
 
             glVertex3fv(points[(n/2)-i][0]);
             glVertex3fv(points[(n/2)+i][n-1]);
+
+            glVertex3fv(points[(n/2)-i][n-1]);
+            glVertex3fv(points[(n/2)+i-1][0]);
+
+            if(i != n/2-1) {
+                glVertex3fv(points[(n/2)-i][0]);
+                glVertex3fv(points[(n/2)+i+1][n-1]);
+            }
         }
+
     glEnd();
 }
 
 void drawEggTriangles(int n) {
     glBegin(GL_TRIANGLES);
         for(int i = 0; i < n; ++i) {
-            for(int j = 0; j < n; ++j) {
-                glVertex3fv(points[i][j]);
+            for(int j = 0; j < n-1; ++j) {
+                drawColoured(i, j);
+                drawColoured(i, j+1);
+                drawColoured((i+1)%n, j);
+
+                drawColoured(i, j+1);
+                drawColoured((i+1)%n, j);
+                drawColoured((i+1)%n, j+1);
             }
+        }
+
+        // connect opposite sides of the egg
+        for(int i = 0; i < n/2; ++i) {
+            drawColoured((n/2)-i, n-1);
+            drawColoured((n/2)+i, 0);
+            drawColoured((n/2)+i+1, 0);
+
+            drawColoured((n/2)-i, n-1);
+            drawColoured((n/2)-i-1, n-1);
+            drawColoured((n/2)+i+1, 0);
+
+            drawColoured((n/2)+i, n-1);
+            drawColoured((n/2)-i, 0);
+            drawColoured((n/2)-i-1, 0);
+
+            drawColoured((n/2)+i, n-1);
+            drawColoured((n/2)+i+1, n-1);
+            drawColoured((n/2)-i-1, 0);
         }
     glEnd();
 }
@@ -176,6 +213,19 @@ void generateEggVertices(int n) {
     }
 }
 
+void generateColours(int n) {
+    for(int i = 0; i < n; ++i) {
+        for(int j = 0; j < n; ++j) {
+            float r = (float)rand() / RAND_MAX;
+            float g = (float)rand() / RAND_MAX;
+            float b = (float)rand() / RAND_MAX;
+
+            colours[i][j][0] = r;
+            colours[i][j][1] = g;
+            colours[i][j][2] = b;
+        }
+    }
+}
 /*************************************************************************************/
 
 // Funkcja określająca co ma być rysowane (zawsze wywoływana gdy trzeba
@@ -203,7 +253,8 @@ void RenderScene(void)
 
     glColor3f(1.0f, 1.0f, 1.0f);
     if(model == 1) drawEggPoints(N);
-    else if(model ==2) drawEggLines(N);
+    else if(model == 2) drawEggLines(N);
+    else if(model == 3) drawEggTriangles(N);
 
     glFlush();
     // Przekazanie poleceń rysujących do wykonania
@@ -257,7 +308,7 @@ void ChangeSize(GLsizei horizontal, GLsizei vertical )
     // Przełączenie macierzy bieżącej na macierz projekcji 
 
     glLoadIdentity();
-    // Czyszcznie macierzy bieżącej            
+    // Czyszcznie macierzy bieżącej
 
     AspectRatio = (GLfloat)horizontal/(GLfloat)vertical;
     // Wyznaczenie współczynnika  proporcji okna
@@ -265,7 +316,7 @@ void ChangeSize(GLsizei horizontal, GLsizei vertical )
     // przestrzeni ograniczającej pozwalającej zachować właściwe
     // proporcje rysowanego obiektu.
     // Do okreslenia przestrzeni ograniczjącej służy funkcja
-    // glOrtho(...)            
+    // glOrtho(...)
 
     if(horizontal <= vertical)
 
@@ -288,6 +339,7 @@ void keys(unsigned char key, int x, int y)
     if(key == 'p') model = 1;
     if(key == 'w') model = 2;
     if(key == 's') model = 3;
+    if(key == 'a') rotate = !rotate;
    
     RenderScene(); // przerysowanie obrazu sceny
 }
@@ -300,16 +352,26 @@ void keys(unsigned char key, int x, int y)
 
 int main(int argc, char** argv)
 {
+    printf("Grafika komputerowa lab3: OpenGL - modelowanie obiektów 3-D\n");
+    printf("Autor: Marcel Guzik\n\n");
+    printf("sterowanie:\n");
+    printf("\ta - zapauzowanie rotacji\n");
+    printf("modele:\n");
+    printf("\tp - siatka punktów\n");
+    printf("\tw - widok szkieletu (wireframe)\n");
+    printf("\ts - kolorowa siatka trójkątów\n");
+
     glutInit(&argc, argv);
 
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB |GLUT_DEPTH);
 
-    glutInitWindowSize(300, 300);
+    glutInitWindowSize(800, 800);
 
-    glutCreateWindow("Układ współrzędnych 3-D");
+    glutCreateWindow("Grafika komputerowa lab3 - Marcel Guzik");
 
     generateEggVertices(N);
-                  
+    generateColours(N);
+
     glutDisplayFunc(RenderScene);
     // Określenie, że funkcja RenderScene będzie funkcją zwrotną
     // (callback function).  Bedzie ona wywoływana za każdym razem
