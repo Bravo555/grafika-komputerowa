@@ -1,16 +1,10 @@
-/*************************************************************************************/
-
-//  Szkielet programu do tworzenia modelu sceny 3-D z wizualizacją osi 
-//  układu współrzednych
-
-/*************************************************************************************/
-
 #include <GL/gl.h>
 #include <GL/glut.h>
 #include <math.h>
 #include <stdio.h>
 
 #define N 20
+const float EPSILON = 0.000001;
 
 typedef float point3[3];
 point3 points[N][N];
@@ -18,18 +12,15 @@ point3 colours[N][N];
 
 int model = 1;
 
-static float viewer[]= {0.0, 0.0, 10.0};
 // inicjalizacja położenia obserwatora
+static float viewer[]= {0.0, 0.0, 10.0};
 
-/*************************************************************************************/
-
-// Funkcja rysująca osie układu wspó?rz?dnych
-
-static float theta = 0.0;   // kąt obrotu obiektu
-static float theta2 = 0.0;
+static float angleY = 0.5 * M_PI;   // kąt obrotu obiektu
+static float angleX = 0.0;
 static float zstep = 0.1;
 
-static GLfloat pix2angle;     // przelicznik pikseli na stopnie
+// przelicznik pikseli na stopnie
+static GLfloat pix2angle;
 
 static GLint status = 0;       // stan klawiszy myszy
                                // 0 - nie naciśnięto żadnego klawisza
@@ -42,11 +33,12 @@ static int delta_x = 0;        // różnica pomiędzy pozycją bieżącą
                                       // i poprzednią kursora myszy
 static int delta_y = 0;
 
-// Funkcja "bada" stan myszy i ustawia wartości odpowiednich zmiennych globalnych
+float R = 10.0;
 
-void Mouse(int btn, int state, int x, int y) {
+// Funkcja "bada" stan myszy i ustawia wartości odpowiednich zmiennych globalnych
+void mousePressed(int btn, int state, int x, int y) {
     x_pos_old=x;        // przypisanie aktualnie odczytanej pozycji kursora
-                            // jako pozycji poprzedniej
+                        // jako pozycji poprzedniej
     y_pos_old = y;
     if(btn==GLUT_LEFT_BUTTON && state == GLUT_DOWN)
     {
@@ -59,7 +51,7 @@ void Mouse(int btn, int state, int x, int y) {
         status = 0;          // nie został wcięnięty żaden klawisz
 }
  
-void Motion(GLsizei x, GLsizei y) {
+void mouseMoved(GLsizei x, GLsizei y) {
     delta_x = x - x_pos_old;     // obliczenie różnicy położenia kursora myszy
     x_pos_old = x;            // podstawienie bieżącego położenia jako poprzednie
 
@@ -69,45 +61,32 @@ void Motion(GLsizei x, GLsizei y) {
     glutPostRedisplay();     // przerysowanie obrazu sceny
 }
 
-/*************************************************************************************/
-
 // Funkcja rysująca osie układu współrzędnych
-
 void Axes() {
-    point3  x_min = {-5.0, 0.0, 0.0};
-    point3  x_max = { 5.0, 0.0, 0.0};
+    point3 x_min = {-10.0, 0.0, 0.0};
+    point3 x_max = { 10.0, 0.0, 0.0};
     // początek i koniec obrazu osi x
 
-    point3  y_min = {0.0, -5.0, 0.0};
-    point3  y_max = {0.0,  5.0, 0.0};
+    point3 y_min = {0.0, -10.0, 0.0};
+    point3 y_max = {0.0,  10.0, 0.0};
     // początek i koniec obrazu osi y
 
-    point3  z_min = {0.0, 0.0, -5.0};
-    point3  z_max = {0.0, 0.0,  5.0};
+    point3 z_min = {0.0, 0.0, -10.0};
+    point3 z_max = {0.0, 0.0,  10.0};
     //  początek i koniec obrazu osi y
 
-    glColor3f(1.0f, 0.0f, 0.0f);  // kolor rysowania osi - czerwony
-    glBegin(GL_LINES); // rysowanie osi x
-
+    glBegin(GL_LINES);
+        glColor3f(1.0f, 0.0f, 0.0f);  // kolor rysowania osi - czerwony
         glVertex3fv(x_min);
         glVertex3fv(x_max);
 
-    glEnd();
-
-    glColor3f(0.0f, 1.0f, 0.0f);  // kolor rysowania - zielony
-    glBegin(GL_LINES);  // rysowanie osi y
-
+        glColor3f(0.0f, 1.0f, 0.0f);  // kolor rysowania - zielony
         glVertex3fv(y_min);
-        glVertex3fv(y_max);                           
+        glVertex3fv(y_max);
 
-    glEnd();
-
-    glColor3f(0.0f, 0.0f, 1.0f);  // kolor rysowania - niebieski
-    glBegin(GL_LINES); // rysowanie osi z
-
+        glColor3f(0.0f, 0.0f, 1.0f);  // kolor rysowania - niebieski
         glVertex3fv(z_min);
         glVertex3fv(z_max);
-
     glEnd();
 
 }
@@ -134,7 +113,6 @@ void drawEggLines(int n) {
                 glVertex3fv(points[i][j]);
                 glVertex3fv(points[i][(j+1)]);
 
-                // TODO: simplify this
                 glVertex3fv(points[i][j]);
                 glVertex3fv(points[(i+1)%n][j]);
                 glVertex3fv(points[i][j+1]);
@@ -142,7 +120,7 @@ void drawEggLines(int n) {
             }
         }
 
-        // draw diagonals
+        // rysuj przekątne
         for(int i = 0; i < n/2; ++i) {
             for(int j = 0; j < n-1; ++j) {
                 glVertex3fv(points[i][j]);
@@ -156,7 +134,7 @@ void drawEggLines(int n) {
             }
         }
 
-        // connect opposite sides of the egg
+        // połącz przeciwne strony jaja
         for(int i = 1; i < n/2; ++i) {
             glVertex3fv(points[(n/2)-i][n-1]);
             glVertex3fv(points[(n/2)+i][0]);
@@ -272,51 +250,62 @@ void generateColours(int n) {
     }
 }
 
-double clamp(double d, double min, double max) {
-  const double t = d < min ? min : d;
-  return t > max ? max : t;
+float clamp(float d, float min, float max) {
+    const float t = d < min ? min : d;
+    return t > max ? max : t;
 }
 
-// Funkcja określająca co ma być rysowane (zawsze wywoływana gdy trzeba
-// przerysować scenę)
-void RenderScene(void)
-{
+float fmodfp(float a, float b) {
+    if(a < 0) {
+        a += b;
+    } else if(a > b) {
+        a -= b;
+    }
+    return a;
+}
+
+// Funkcja określająca co ma być rysowane (zawsze wywoływana gdy trzeba przerysować scenę)
+void renderScene(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    // Czyszczenie okna aktualnym kolorem czyszczącym
 
     glLoadIdentity();
-    // Czyszczenie macierzy bieżącej
 
-    gluLookAt(viewer[0],viewer[1],viewer[2], 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
     // Zdefiniowanie położenia obserwatora
+    gluLookAt(viewer[0],viewer[1],viewer[2], 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
 
     Axes();
-    // Narysowanie osi przy pomocy funkcji zdefiniowanej wyżej
 
-
+    printf("angleY:%f, angleX: %f\n", angleY, angleX);
+    printf("x: %f, y: %f, z: %f\n", viewer[0], viewer[1], viewer[2]);
     if(status == 1) {
-        theta = fabs(fmodf((theta + delta_x * 0.05), 2 * M_PI));
-        theta2 = clamp((theta2 + delta_y * 0.05), -M_PI / 2 + 0.0001, M_PI / 2 - 0.0001);
-        printf("theta:%f, theta2: %f\n", theta, theta2);
+        angleY = fmodfp(angleY + delta_x * 0.02, 2 * M_PI);
+        angleX = fmodfp(angleX + delta_y * 0.02, 2 * M_PI);
+        if(0.5 * M_PI < angleX && angleX < 1.0 * M_PI) {
+            angleX = 0.5 * M_PI - EPSILON;
+        } else if(1.0 * M_PI < angleX && angleX < 1.5 * M_PI) {
+            angleX = 1.5 * M_PI + EPSILON;
+        }
+
+        printf("angleY:%f, angleX: %f\n", angleY, angleX);
         printf("x: %f, y: %f, z: %f\n", viewer[0], viewer[1], viewer[2]);
     }
-    if(status == 2) {
-        viewer[2] += delta_y * zstep;
+    else if(status == 2) {
+        R += delta_y * zstep;
     }
 
-    float r = 10.0;
 
-    viewer[0] = r * cos(theta) * cos(theta2);
-    viewer[1] = r * sin(theta2);
-    viewer[2] = r * sin(theta) * cos(theta2);
+    viewer[0] = R * cos(angleY) * cos(angleX);
+    viewer[1] = R * sin(angleX);
+    viewer[2] = R * sin(angleY) * cos(angleX);
 
-    glTranslatef(0.0f, -5.0f, 0.0f);
+    if(model != 4) glTranslatef(0.0f, -5.0f, 0.0f);
 
 
     glColor3f(1.0f, 1.0f, 1.0f);
     if(model == 1) drawEggPoints(N);
     else if(model == 2) drawEggLines(N);
     else if(model == 3) drawEggTriangles(N);
+    else if(model == 4) glutWireTeapot(3.0);
 
 
     glFlush();
@@ -326,28 +315,7 @@ void RenderScene(void)
     glutSwapBuffers();
 }
 
-/*************************************************************************************/
-
-// Funkcja ustalająca stan renderowania
-
- 
-
-void MyInit(void)
-{
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    // Kolor czyszcący (wypełnienia okna) ustawiono na czarny
-}
-
-/*************************************************************************************/
-
-// Funkcja ma za zadanie utrzymanie stałych proporcji rysowanych
-// w przypadku zmiany rozmiarów okna.
-// Parametry vertical i horizontal (wysokość i szerokość okna) są
-// przekazywane do funkcji za każdym razem gdy zmieni się rozmiar okna.
-
- 
-
-void ChangeSize(GLsizei horizontal, GLsizei vertical ) {
+void changeSize(GLsizei horizontal, GLsizei vertical ) {
     pix2angle = 360.0/(float)horizontal;  // przeliczenie pikseli na stopnie
 
     glMatrixMode(GL_PROJECTION);
@@ -375,59 +343,44 @@ void ChangeSize(GLsizei horizontal, GLsizei vertical ) {
     // Czyszczenie macierzy bieżącej
 }
 
-void keys(unsigned char key, int x, int y)
+void keyPressed(unsigned char key, int x, int y)
 {
     if(key == 'p') model = 1;
     if(key == 'w') model = 2;
     if(key == 's') model = 3;
+    if(key == 'c') model = 4;
    
-    RenderScene(); // przerysowanie obrazu sceny
+    renderScene(); // przerysowanie obrazu sceny
 }
 
 int main(int argc, char** argv) {
-    printf("Grafika komputerowa lab3: OpenGL - interakcja z uzytkownikiem\n");
+    printf("Grafika komputerowa lab4: OpenGL - interakcja z uzytkownikiem\n");
     printf("Autor: Marcel Guzik\n\n");
-    printf("sterowanie:\n");
-    printf("\ta - zapauzowanie rotacji\n");
     printf("modele:\n");
-    printf("\tp - siatka punktów\n");
-    printf("\tw - widok szkieletu (wireframe)\n");
-    printf("\ts - kolorowa siatka trójkątów\n");
+    printf("\tp - jajo, siatka punktów\n");
+    printf("\tw - jajo, widok szkieletu (wireframe)\n");
+    printf("\ts - jajo, kolorowa siatka trójkątów\n");
+    printf("\tc - czajnik\n");
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB |GLUT_DEPTH);
-    glutInitWindowSize(300, 300);
-    glutCreateWindow("Układ współrzędnych 3-D");
+    glutInitWindowSize(600, 600);
+    glutCreateWindow("Grafika komputerowa lab4 - Marcel Guzik");
 
     generateEggVertices(N);
     generateColours(N);
 
-    // Określenie, że funkcja RenderScene będzie funkcją zwrotną
-    // (callback function).  Bedzie ona wywoływana za każdym razem
-    // gdy zajdzie potrzba przeryswania okna 
-    glutDisplayFunc(RenderScene);
-
-    // Dla aktualnego okna ustala funkcję zwrotną odpowiedzialną
-    // zazmiany rozmiaru okna      
-    glutReshapeFunc(ChangeSize);
-
-    // Ustala funkcję zwrotną odpowiedzialną za badanie stanu myszy
-    glutMouseFunc(Mouse);
-    
-    // Ustala funkcję zwrotną odpowiedzialną za badanie ruchu myszy
-    glutMotionFunc(Motion);
+    glutDisplayFunc(renderScene);
+    glutReshapeFunc(changeSize);
+    glutMouseFunc(mousePressed);
+    glutMotionFunc(mouseMoved);
+    glutKeyboardFunc(keyPressed);
 
 
-    // Funkcja MyInit() (zdefiniowana powyżej) wykonuje wszelkie
-    // inicjalizacje konieczne  przed przystąpieniem do renderowania 
-    MyInit();
-
-    // Włączenie mechanizmu usuwania powierzchni niewidocznych
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_DEPTH_TEST);
 
-    glutKeyboardFunc(keys);
 
-    // Funkcja uruchamia szkielet biblioteki GLUT
     glutMainLoop();
 
 }
