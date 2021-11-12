@@ -14,6 +14,7 @@
 
 typedef float point3[3];
 point3 points[N][N];
+point3 colours[N][N];
 
 int model = 1;
 
@@ -111,6 +112,11 @@ void Axes() {
 
 }
 
+void drawColoured(int u, int v) {
+    glColor3fv(colours[u][v]);
+    glVertex3fv(points[u][v]);
+}
+
 void drawEggPoints(int n) {
     glBegin(GL_POINTS);
         for(int i = 0; i < n; ++i) {
@@ -133,34 +139,74 @@ void drawEggLines(int n) {
                 glVertex3fv(points[(i+1)%n][j]);
                 glVertex3fv(points[i][j+1]);
                 glVertex3fv(points[(i+1)%n][j+1]);
+            }
+        }
 
+        // draw diagonals
+        for(int i = 0; i < n/2; ++i) {
+            for(int j = 0; j < n-1; ++j) {
                 glVertex3fv(points[i][j]);
                 glVertex3fv(points[(i+1)%n][(j+1)%n]);
-
-                glVertex3fv(points[i][(j+1)%n]);
-                glVertex3fv(points[(i+1)%n][(j+2)%n]);
             }
-            glVertex3fv(points[i][0]);
-            glVertex3fv(points[(i+1)%n][0]);
+        }
+        for(int i = n/2; i < n; ++i) {
+            for(int j = 1; j < n; ++j) {
+                glVertex3fv(points[i][j]);
+                glVertex3fv(points[(i+1)%n][(j-1)%n]);
+            }
         }
 
         // connect opposite sides of the egg
-        for(int i = 0; i < n/2; ++i) {
+        for(int i = 1; i < n/2; ++i) {
             glVertex3fv(points[(n/2)-i][n-1]);
             glVertex3fv(points[(n/2)+i][0]);
 
             glVertex3fv(points[(n/2)-i][0]);
             glVertex3fv(points[(n/2)+i][n-1]);
+
+            glVertex3fv(points[(n/2)-i][n-1]);
+            glVertex3fv(points[(n/2)+i-1][0]);
+
+            if(i != n/2-1) {
+                glVertex3fv(points[(n/2)-i][0]);
+                glVertex3fv(points[(n/2)+i+1][n-1]);
+            }
         }
+
     glEnd();
 }
 
 void drawEggTriangles(int n) {
     glBegin(GL_TRIANGLES);
         for(int i = 0; i < n; ++i) {
-            for(int j = 0; j < n; ++j) {
-                glVertex3fv(points[i][j]);
+            for(int j = 0; j < n-1; ++j) {
+                drawColoured(i, j);
+                drawColoured(i, j+1);
+                drawColoured((i+1)%n, j);
+
+                drawColoured(i, j+1);
+                drawColoured((i+1)%n, j);
+                drawColoured((i+1)%n, j+1);
             }
+        }
+
+        // connect opposite sides of the egg
+        for(int i = 0; i < n/2; ++i) {
+            drawColoured((n/2)-i, n-1);
+            drawColoured((n/2)+i, 0);
+            drawColoured((n/2)+i+1, 0);
+
+            drawColoured((n/2)-i, n-1);
+            drawColoured((n/2)-i-1, n-1);
+            drawColoured((n/2)+i+1, 0);
+
+            drawColoured((n/2)+i, n-1);
+            drawColoured((n/2)-i, 0);
+            drawColoured((n/2)-i-1, 0);
+
+            drawColoured((n/2)+i, n-1);
+            drawColoured((n/2)+i+1, n-1);
+            drawColoured((n/2)-i-1, 0);
         }
     glEnd();
 }
@@ -212,6 +258,20 @@ void generateEggVertices(int n) {
     }
 }
 
+void generateColours(int n) {
+    for(int i = 0; i < n; ++i) {
+        for(int j = 0; j < n; ++j) {
+            float r = (float)rand() / RAND_MAX;
+            float g = (float)rand() / RAND_MAX;
+            float b = (float)rand() / RAND_MAX;
+
+            colours[i][j][0] = r;
+            colours[i][j][1] = g;
+            colours[i][j][2] = b;
+        }
+    }
+}
+
 double clamp(double d, double min, double max) {
   const double t = d < min ? min : d;
   return t > max ? max : t;
@@ -235,8 +295,8 @@ void RenderScene(void)
 
 
     if(status == 1) {
-        theta = fmod((theta + delta_x * 0.05), 2 * M_PI);
-        theta2 = fmod((theta2 + delta_y * 0.05), 2 * M_PI);
+        theta = fabs(fmodf((theta + delta_x * 0.05), 2 * M_PI));
+        theta2 = clamp((theta2 + delta_y * 0.05), -M_PI / 2 + 0.0001, M_PI / 2 - 0.0001);
         printf("theta:%f, theta2: %f\n", theta, theta2);
         printf("x: %f, y: %f, z: %f\n", viewer[0], viewer[1], viewer[2]);
     }
@@ -255,7 +315,8 @@ void RenderScene(void)
 
     glColor3f(1.0f, 1.0f, 1.0f);
     if(model == 1) drawEggPoints(N);
-    else if(model ==2) drawEggLines(N);
+    else if(model == 2) drawEggLines(N);
+    else if(model == 3) drawEggTriangles(N);
 
 
     glFlush();
@@ -323,49 +384,50 @@ void keys(unsigned char key, int x, int y)
     RenderScene(); // przerysowanie obrazu sceny
 }
 
-/*************************************************************************************/
+int main(int argc, char** argv) {
+    printf("Grafika komputerowa lab3: OpenGL - interakcja z uzytkownikiem\n");
+    printf("Autor: Marcel Guzik\n\n");
+    printf("sterowanie:\n");
+    printf("\ta - zapauzowanie rotacji\n");
+    printf("modele:\n");
+    printf("\tp - siatka punktów\n");
+    printf("\tw - widok szkieletu (wireframe)\n");
+    printf("\ts - kolorowa siatka trójkątów\n");
 
-// Główny punkt wejścia programu. Program działa w trybie konsoli
-
- 
-
-int main(int argc, char** argv)
-{
     glutInit(&argc, argv);
-
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB |GLUT_DEPTH);
-
     glutInitWindowSize(300, 300);
-
     glutCreateWindow("Układ współrzędnych 3-D");
 
     generateEggVertices(N);
-    glutDisplayFunc(RenderScene);
+    generateColours(N);
+
     // Określenie, że funkcja RenderScene będzie funkcją zwrotną
     // (callback function).  Bedzie ona wywoływana za każdym razem
     // gdy zajdzie potrzba przeryswania okna 
+    glutDisplayFunc(RenderScene);
 
-    glutReshapeFunc(ChangeSize);
     // Dla aktualnego okna ustala funkcję zwrotną odpowiedzialną
     // zazmiany rozmiaru okna      
+    glutReshapeFunc(ChangeSize);
 
-    glutMouseFunc(Mouse);
     // Ustala funkcję zwrotną odpowiedzialną za badanie stanu myszy
+    glutMouseFunc(Mouse);
     
-    glutMotionFunc(Motion);
     // Ustala funkcję zwrotną odpowiedzialną za badanie ruchu myszy
+    glutMotionFunc(Motion);
 
 
-    MyInit();
     // Funkcja MyInit() (zdefiniowana powyżej) wykonuje wszelkie
     // inicjalizacje konieczne  przed przystąpieniem do renderowania 
+    MyInit();
 
-    glEnable(GL_DEPTH_TEST);
     // Włączenie mechanizmu usuwania powierzchni niewidocznych
+    glEnable(GL_DEPTH_TEST);
 
     glutKeyboardFunc(keys);
 
-    glutMainLoop();
     // Funkcja uruchamia szkielet biblioteki GLUT
+    glutMainLoop();
 
 }
