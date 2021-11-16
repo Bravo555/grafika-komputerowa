@@ -1,2 +1,9 @@
 *.out
 *.~lock
+*.aux
+*latexmk
+*.fls
+*.log
+*.synctex.gz
+**/_minted*
+*.SRCINFO
