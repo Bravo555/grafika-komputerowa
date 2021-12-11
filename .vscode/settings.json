@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "*.rh": "c",
+        "bit": "c",
+        "fstream": "c",
+        "condition_variable": "c",
+        "cmath": "c",
+        "complex": "c",
+        "*.tcc": "c",
+        "numbers": "c"
+    }
+}
