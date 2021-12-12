@@ -1,24 +1,32 @@
+#include <stdio.h>
 #include <GL/gl.h>
 #include <GL/glut.h>
+#define __USE_MISC
 #include <math.h>
-#include <stdio.h>
 
-#define N 20
+#define N 101
 const float EPSILON = 0.000001;
 
+// położenie źródła
+
 typedef float point3[3];
+
 point3 points[N][N];
 point3 normals[N][N];
 point3 colours[N][N];
 
+// tablica zawiera kolejno kąt elewacji, azymutu, oraz odległość
+typedef float angles[3];
+
+angles viewerAngles = {0.0, 0.5 * M_PI, 10.0};
+angles light0Angles = {0.0, 0.5 * M_PI, 10.0};
+angles light1Angles = {0.0, 0.5 * M_PI, 10.0};
+
+// Aktualnie wybrane kąty które będą modyfikowane przez poruszanie myszą
+float* currentAngles = light0Angles;
+
 int model = 3;
 
-
-// inicjalizacja położenia obserwatora
-static float viewer[]= {0.0, 0.0, 10.0};
-
-static float angleY = 0.5 * M_PI;   // kąt obrotu obiektu
-static float angleX = 0.0;
 static float zstep = 0.1;
 
 // przelicznik pikseli na stopnie
@@ -53,12 +61,54 @@ void mousePressed(int btn, int state, int x, int y) {
         status = 0;          // nie został wcięnięty żaden klawisz
 }
 
+float clamp(float d, float min, float max) {
+    const float t = d < min ? min : d;
+    return t > max ? max : t;
+}
+
+float fmodfp(float a, float b) {
+    if(a < 0) {
+        a += b;
+    } else if(a > b) {
+        a -= b;
+    }
+    return a;
+}
+
+void angles_to_coords(float* angles, point3 coords) {
+    coords[0] = angles[2] * cos(angles[1]) * cos(angles[0]);
+    coords[1] = angles[2] * sin(angles[0]);
+    coords[2] = angles[2] * sin(angles[1]) * cos(angles[0]);
+}
+
 void mouseMoved(GLsizei x, GLsizei y) {
     delta_x = x - x_pos_old;     // obliczenie różnicy położenia kursora myszy
     x_pos_old = x;            // podstawienie bieżącego położenia jako poprzednie
 
     delta_y = y - y_pos_old;
     y_pos_old = y;
+
+    if(status == 1) {
+        float new_elevation, new_azimuth;
+        if(currentAngles == viewerAngles) {
+            new_elevation = currentAngles[0] + delta_y * 0.02;
+            new_azimuth = currentAngles[1] + delta_x * 0.02;
+        } else {
+            new_elevation = currentAngles[0] - delta_y * 0.02;
+            new_azimuth = currentAngles[1] - delta_x * 0.02;
+        }
+
+        currentAngles[0] = fmodfp(new_elevation, 2 * M_PI);
+        currentAngles[1] = fmodfp(new_azimuth, 2 * M_PI);
+        if(0.5 * M_PI < currentAngles[0] && currentAngles[0] < 1.0 * M_PI) {
+            currentAngles[0] = 0.5 * M_PI - EPSILON;
+        } else if(1.0 * M_PI < currentAngles[0] && currentAngles[0] < 1.5 * M_PI) {
+            currentAngles[0] = 1.5 * M_PI + EPSILON;
+        }
+    }
+    else if(status == 2) {
+        currentAngles[2] += delta_y * zstep;
+    }
 
     glutPostRedisplay();     // przerysowanie obrazu sceny
 }
@@ -196,7 +246,15 @@ void drawVertexWithNormal(int u, int v) {
     glVertex3fv(points[u][v]);
 }
 
+void drawNormal(int u, int v) {
+    float* p = points[u][v];
+    float* n = normals[u][v];
+    glVertex3fv(p);
+    glVertex3f(p[0] + n[0], p[1] + n[1], p[2] + n[2]);
+}
+
 void drawEggTrianglesWithNormals(int n) {
+    glEnable(GL_LIGHTING);
     glBegin(GL_TRIANGLES);
         for(int i = 0; i < n; ++i) {
             for(int j = 0; j < n-1; ++j) {
@@ -229,13 +287,28 @@ void drawEggTrianglesWithNormals(int n) {
             drawVertexWithNormal((n/2)-i-1, 0);
         }
     glEnd();
+
+    // draw normals
+    glDisable(GL_LIGHTING);
+    glBegin(GL_LINES);
+        glColor3f(1.0f, 0.0f, 0.0f);
+
+        for(int u = 0; u < n; ++u) {
+            for(int v = 0; v < n; ++v) {
+                // drawNormal(u, v);
+            }
+        }
+
+    glEnd();
 }
 
 void generateEggVerticesWithNormals(int n) {
-    float step = 1.0f / n;
+    float step = 1.0f / (n - 1);
 
     for(int i = 0; i < n; ++i) {
         float u = i * step;
+        if(u == 0.0) u += EPSILON;
+        if(u == 1.0) u -= EPSILON;
         for(int j = 0; j < n; ++j) {
             float v = j * step;
             float u_step = u;
@@ -301,13 +374,21 @@ void generateEggVerticesWithNormals(int n) {
 
             float nx = ynu * znv - znu * ynv;
             float ny = znu * xnv - znv * xnu;
-            float nz = xnu * ynv - xnu * ynv;
+            float nz = xnu * ynv - xnv * ynu;
+
+            if(z > 0.0f || z == 0.0f && x > 0.0f) {
+                nx = -nx;
+                ny = -ny;
+                nz = -nz;
+            }
 
             float n_len = sqrt(nx * nx + ny * ny + nz * nz);
 
-            nx /= n_len;
-            ny /= n_len;
-            nz /= n_len;
+            if(n_len != 0.0) {
+                nx /= n_len;
+                ny /= n_len;
+                nz /= n_len;
+            }
 
             normals[i][j][0] = nx;
             normals[i][j][1] = ny;
@@ -377,49 +458,26 @@ void generateColours(int n) {
     }
 }
 
-float clamp(float d, float min, float max) {
-    const float t = d < min ? min : d;
-    return t > max ? max : t;
-}
-
-float fmodfp(float a, float b) {
-    if(a < 0) {
-        a += b;
-    } else if(a > b) {
-        a -= b;
-    }
-    return a;
-}
-
 // Funkcja określająca co ma być rysowane (zawsze wywoływana gdy trzeba przerysować scenę)
 void renderScene(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glDisable(GL_LIGHTING);   // właczenie systemu oświetlenia sceny
 
     glLoadIdentity();
+    float currentPosition[4] = {0.0, 0.0, 0.0, 1.0};
 
+    angles_to_coords(viewerAngles, currentPosition);
     // Zdefiniowanie położenia obserwatora
-    gluLookAt(viewer[0],viewer[1],viewer[2], 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+    gluLookAt(currentPosition[0], currentPosition[1], currentPosition[2], 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+
+    angles_to_coords(currentAngles, currentPosition);
+
+    angles_to_coords(light0Angles, currentPosition);
+    glLightfv(GL_LIGHT0, GL_POSITION, currentPosition);
+    angles_to_coords(light1Angles, currentPosition);
+    glLightfv(GL_LIGHT1, GL_POSITION, currentPosition);
 
     Axes();
-
-    if(status == 1) {
-        angleY = fmodfp(angleY + delta_x * 0.02, 2 * M_PI);
-        angleX = fmodfp(angleX + delta_y * 0.02, 2 * M_PI);
-        if(0.5 * M_PI < angleX && angleX < 1.0 * M_PI) {
-            angleX = 0.5 * M_PI - EPSILON;
-        } else if(1.0 * M_PI < angleX && angleX < 1.5 * M_PI) {
-            angleX = 1.5 * M_PI + EPSILON;
-        }
-    }
-    else if(status == 2) {
-        R += delta_y * zstep;
-    }
-
-
-    viewer[0] = R * cos(angleY) * cos(angleX);
-    viewer[1] = R * sin(angleX);
-    viewer[2] = R * sin(angleY) * cos(angleX);
 
     if(model != 4) glTranslatef(0.0f, -5.0f, 0.0f);
 
@@ -467,8 +525,29 @@ void changeSize(GLsizei horizontal, GLsizei vertical ) {
     // Czyszczenie macierzy bieżącej
 }
 
-void keyPressed(unsigned char key, int x, int y)
-{
+void keyPressed(unsigned char key, int x, int y) {
+    switch (key)
+    {
+    case '1':
+        currentAngles = light0Angles;
+        break;
+    case '2':
+        currentAngles = light1Angles;
+        break;
+    case '3':
+        currentAngles = viewerAngles;
+        break;
+
+    case 'p': model = 1; break;
+    case 'w': model = 2; break;
+    case 's': model = 3; break;
+    case 'c': model = 4; break;
+    
+    default:
+        break;
+    }
+
+    glutPostRedisplay();
 }
 
 void init() {
@@ -484,22 +563,20 @@ void init() {
     // współczynnik n opisujący połysk powierzchni
     float mat_shininess  = {20.0};
 
-    // Definicja źródła światła
-
-    // położenie źródła
-    float light_position[] = {0.0, 0.0, 10.0, 1.0};   
 
     float light_ambient[] = {0.1, 0.1, 0.1, 1.0};
     // składowe intensywności świecenia źródła światła otoczenia
     // Ia = [Iar,Iag,Iab]
 
-    float light_diffuse[] = {1.0, 1.0, 1.0, 1.0};       
+    float light_diffuse[] = {1.0, 0.0, 0.0, 1.0};
     // składowe intensywności świecenia źródła światła powodującego
     // odbicie dyfuzyjne Id = [Idr,Idg,Idb]
 
     float light_specular[]= {1.0, 1.0, 1.0, 1.0};
     // składowe intensywności świecenia źródła światła powodującego
     // odbicie kierunkowe Is = [Isr,Isg,Isb]
+
+    float light_diffuse2[] = {0.0, 0.0, 1.0, 1.0};
 
     float att_constant  = {1.0};
     // składowa stała ds dla modelu zmian oświetlenia w funkcji
@@ -526,25 +603,41 @@ void init() {
 
     glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+
+    float pos[4] = {0.0, 0.0, 0.0, 1.0};
+    angles_to_coords(light0Angles, pos);
     glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
-    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+    glLightfv(GL_LIGHT0, GL_POSITION, pos);
 
     glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, att_constant);
     glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, att_linear);
     glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, att_quadratic);
 
 
+    glLightfv(GL_LIGHT1, GL_AMBIENT, light_ambient);
+    glLightfv(GL_LIGHT1, GL_DIFFUSE, light_diffuse2);
+    glLightfv(GL_LIGHT1, GL_SPECULAR, light_specular);
+    angles_to_coords(light1Angles, pos);
+    glLightfv(GL_LIGHT1, GL_POSITION, pos);
+
+    glLightf(GL_LIGHT1, GL_CONSTANT_ATTENUATION, att_constant);
+    glLightf(GL_LIGHT1, GL_LINEAR_ATTENUATION, att_linear);
+    glLightf(GL_LIGHT1, GL_QUADRATIC_ATTENUATION, att_quadratic);
 /*************************************************************************************/
 // Ustawienie opcji systemu oświetlania sceny
 
     glShadeModel(GL_SMOOTH); // właczenie łagodnego cieniowania
     glEnable(GL_LIGHT0);     // włączenie źródła o numerze 0
+    glEnable(GL_LIGHT1);     // włączenie źródła o numerze 0
     glEnable(GL_DEPTH_TEST); // włączenie mechanizmu z-bufora
 }
 
 int main(int argc, char** argv) {
     printf("Grafika komputerowa lab5: OpenGL - oświetlenie\n");
     printf("Autor: Marcel Guzik\n\n");
+    printf("1 - światło czerwone\n");
+    printf("2 - światło niebieskie\n");
+    printf("3 - pozycja obserwatora\n\n");
     printf("modele:\n");
     printf("\tp - jajo, siatka punktów\n");
     printf("\tw - jajo, widok szkieletu (wireframe)\n");
