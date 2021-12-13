@@ -3,24 +3,24 @@
 #include <GL/glut.h>
 #define __USE_MISC
 #include <math.h>
+#include <stdbool.h>
 
 #define N 101
 const float EPSILON = 0.000001;
-
-// położenie źródła
 
 typedef float point3[3];
 
 point3 points[N][N];
 point3 normals[N][N];
 point3 colours[N][N];
+bool drawNormals = false;
 
 // tablica zawiera kolejno kąt elewacji, azymutu, oraz odległość
 typedef float angles[3];
 
 angles viewerAngles = {0.0, 0.5 * M_PI, 10.0};
-angles light0Angles = {0.0, 0.5 * M_PI, 10.0};
-angles light1Angles = {0.0, 0.5 * M_PI, 10.0};
+angles light0Angles = {0.0, 0.25 * M_PI, 10.0};
+angles light1Angles = {0.0, 0.75 * M_PI, 10.0};
 
 // Aktualnie wybrane kąty które będą modyfikowane przez poruszanie myszą
 float* currentAngles = light0Angles;
@@ -29,8 +29,6 @@ int model = 3;
 
 static float zstep = 0.1;
 
-// przelicznik pikseli na stopnie
-static GLfloat pix2angle;
 
 static GLint status = 0;       // stan klawiszy myszy
                                // 0 - nie naciśnięto żadnego klawisza
@@ -143,8 +141,8 @@ void Axes() {
 
 }
 
-void drawColoured(int u, int v) {
-    glColor3fv(colours[u][v]);
+void drawVertexWithNormal(int u, int v) {
+    glNormal3fv(normals[u][v]);
     glVertex3fv(points[u][v]);
 }
 
@@ -152,7 +150,7 @@ void drawEggPoints(int n) {
     glBegin(GL_POINTS);
         for(int i = 0; i < n; ++i) {
             for(int j = 0; j < n; ++j) {
-                glVertex3fv(points[i][j]);
+                drawVertexWithNormal(i, j);
             }
         }
     glEnd();
@@ -162,88 +160,48 @@ void drawEggLines(int n) {
     glBegin(GL_LINES);
         for(int i = 0; i < n; ++i) {
             for(int j = 0; j < n-1; ++j) {
-                glVertex3fv(points[i][j]);
-                glVertex3fv(points[i][(j+1)]);
+                drawVertexWithNormal(i,j);
+                drawVertexWithNormal(i,(j+1));
 
-                glVertex3fv(points[i][j]);
-                glVertex3fv(points[(i+1)%n][j]);
-                glVertex3fv(points[i][j+1]);
-                glVertex3fv(points[(i+1)%n][j+1]);
+                drawVertexWithNormal(i,j);
+                drawVertexWithNormal((i+1)%n,j);
+                drawVertexWithNormal(i,j+1);
+                drawVertexWithNormal((i+1)%n,j+1);
             }
         }
 
         // rysuj przekątne
         for(int i = 0; i < n/2; ++i) {
             for(int j = 0; j < n-1; ++j) {
-                glVertex3fv(points[i][j]);
-                glVertex3fv(points[(i+1)%n][(j+1)%n]);
+                drawVertexWithNormal(i,j);
+                drawVertexWithNormal((i+1)%n,(j+1)%n);
             }
         }
         for(int i = n/2; i < n; ++i) {
             for(int j = 1; j < n; ++j) {
-                glVertex3fv(points[i][j]);
-                glVertex3fv(points[(i+1)%n][(j-1)%n]);
+                drawVertexWithNormal(i,j);
+                drawVertexWithNormal((i+1)%n,(j-1)%n);
             }
         }
 
         // połącz przeciwne strony jaja
         for(int i = 1; i < n/2; ++i) {
-            glVertex3fv(points[(n/2)-i][n-1]);
-            glVertex3fv(points[(n/2)+i][0]);
+            drawVertexWithNormal((n/2)-i,n-1);
+            drawVertexWithNormal((n/2)+i,0);
 
-            glVertex3fv(points[(n/2)-i][0]);
-            glVertex3fv(points[(n/2)+i][n-1]);
+            drawVertexWithNormal((n/2)-i,0);
+            drawVertexWithNormal((n/2)+i,n-1);
 
-            glVertex3fv(points[(n/2)-i][n-1]);
-            glVertex3fv(points[(n/2)+i-1][0]);
+            drawVertexWithNormal((n/2)-i,n-1);
+            drawVertexWithNormal((n/2)+i-1,0);
 
             if(i != n/2-1) {
-                glVertex3fv(points[(n/2)-i][0]);
-                glVertex3fv(points[(n/2)+i+1][n-1]);
+                drawVertexWithNormal((n/2)-i,0);
+                drawVertexWithNormal((n/2)+i+1,n-1);
             }
         }
 
     glEnd();
-}
-
-void drawEggTriangles(int n) {
-    glBegin(GL_TRIANGLES);
-        for(int i = 0; i < n; ++i) {
-            for(int j = 0; j < n-1; ++j) {
-                drawColoured(i, j);
-                drawColoured(i, j+1);
-                drawColoured((i+1)%n, j);
-
-                drawColoured(i, j+1);
-                drawColoured((i+1)%n, j);
-                drawColoured((i+1)%n, j+1);
-            }
-        }
-
-        // connect opposite sides of the egg
-        for(int i = 0; i < n/2; ++i) {
-            drawColoured((n/2)-i, n-1);
-            drawColoured((n/2)+i, 0);
-            drawColoured((n/2)+i+1, 0);
-
-            drawColoured((n/2)-i, n-1);
-            drawColoured((n/2)-i-1, n-1);
-            drawColoured((n/2)+i+1, 0);
-
-            drawColoured((n/2)+i, n-1);
-            drawColoured((n/2)-i, 0);
-            drawColoured((n/2)-i-1, 0);
-
-            drawColoured((n/2)+i, n-1);
-            drawColoured((n/2)+i+1, n-1);
-            drawColoured((n/2)-i-1, 0);
-        }
-    glEnd();
-}
-
-void drawVertexWithNormal(int u, int v) {
-    glNormal3fv(normals[u][v]);
-    glVertex3fv(points[u][v]);
 }
 
 void drawNormal(int u, int v) {
@@ -253,7 +211,7 @@ void drawNormal(int u, int v) {
     glVertex3f(p[0] + n[0], p[1] + n[1], p[2] + n[2]);
 }
 
-void drawEggTrianglesWithNormals(int n) {
+void drawEggTriangles(int n) {
     glEnable(GL_LIGHTING);
     glBegin(GL_TRIANGLES);
         for(int i = 0; i < n; ++i) {
@@ -288,18 +246,19 @@ void drawEggTrianglesWithNormals(int n) {
         }
     glEnd();
 
-    // draw normals
-    glDisable(GL_LIGHTING);
-    glBegin(GL_LINES);
-        glColor3f(1.0f, 0.0f, 0.0f);
+    if(drawNormals) {
+        glDisable(GL_LIGHTING);
+        glBegin(GL_LINES);
+            glColor3f(1.0f, 0.0f, 0.0f);
 
-        for(int u = 0; u < n; ++u) {
-            for(int v = 0; v < n; ++v) {
-                // drawNormal(u, v);
+            for(int u = 0; u < n; ++u) {
+                for(int v = 0; v < n; ++v) {
+                    drawNormal(u, v);
+                }
             }
-        }
 
-    glEnd();
+        glEnd();
+    }
 }
 
 void generateEggVerticesWithNormals(int n) {
@@ -376,7 +335,7 @@ void generateEggVerticesWithNormals(int n) {
             float ny = znu * xnv - znv * xnu;
             float nz = xnu * ynv - xnv * ynu;
 
-            if(z > 0.0f || z == 0.0f && x > 0.0f) {
+            if(z > 0.0f || (z == 0.0f && x > 0.0f)) {
                 nx = -nx;
                 ny = -ny;
                 nz = -nz;
@@ -393,67 +352,6 @@ void generateEggVerticesWithNormals(int n) {
             normals[i][j][0] = nx;
             normals[i][j][1] = ny;
             normals[i][j][2] = nz;
-        }
-    }
-}
-
-void generateEggVertices(int n) {
-    float step = 1.0f / n;
-
-    for(int i = 0; i < n; ++i) {
-        float u = i * step;
-        for(int j = 0; j < n; ++j) {
-            float v = j * step;
-            float u_step = u;
-            float x = 0.0f, y = 0.0f, z = 0.0f;
-
-            x -= 45.0f * u_step;
-            z -= 45.0f * u_step;
-
-            // u^2
-            u_step *= u;
-            x += 180.0f * u_step;
-            y += 160.0f * u_step;
-            z += 180.0f * u_step;
-
-            // u^3
-            u_step *= u;
-            x -= 270.0f * u_step;
-            y -= 320.0f * u_step;
-            z -= 270.0f * u_step;
-
-            // u^4
-            u_step *= u;
-            x += 225.0f * u_step;
-            y += 160.0f * u_step;
-            z += 225.0f * u_step;
-
-            // u^5
-            u_step *= u;
-            x -= 90.0f * u_step;
-            z -= 90.0f * u_step;
-
-            x *= cos(M_PI * v);
-            z *= sin(M_PI * v);
-
-            points[i][j][0] = x;
-            points[i][j][1] = y;
-            points[i][j][2] = z;
-
-        }
-    }
-}
-
-void generateColours(int n) {
-    for(int i = 0; i < n; ++i) {
-        for(int j = 0; j < n; ++j) {
-            float r = (float)rand() / RAND_MAX;
-            float g = (float)rand() / RAND_MAX;
-            float b = (float)rand() / RAND_MAX;
-
-            colours[i][j][0] = r;
-            colours[i][j][1] = g;
-            colours[i][j][2] = b;
         }
     }
 }
@@ -486,43 +384,33 @@ void renderScene(void) {
     glColor3f(1.0f, 1.0f, 1.0f);
     if(model == 1) drawEggPoints(N);
     else if(model == 2) drawEggLines(N);
-    else if(model == 3) drawEggTrianglesWithNormals(N);
+    else if(model == 3) drawEggTriangles(N);
     else if(model == 4) glutSolidTeapot(3.0);
 
 
     glFlush();
     // Przekazanie poleceń rysujących do wykonania
 
-
     glutSwapBuffers();
 }
 
-void changeSize(GLsizei horizontal, GLsizei vertical ) {
-    pix2angle = 360.0/(float)horizontal;  // przeliczenie pikseli na stopnie
-
+void changeSize(int horizontal, int vertical) {
     glMatrixMode(GL_PROJECTION);
-    // Przełączenie macierzy bieżącej na macierz projekcji
-
     glLoadIdentity();
-    // Czyszcznie macierzy bieżącej
 
-    gluPerspective(70, 1.0, 1.0, 30.0);
-    // Ustawienie parametrów dla rzutu perspektywicznego
+    if(vertical == 0) return;
+    glViewport(0, 0, horizontal, vertical);
 
-
-    if(horizontal <= vertical)
-        glViewport(0, (vertical-horizontal)/2, horizontal, horizontal);
-
-    else
-        glViewport((horizontal-vertical)/2, 0, vertical, vertical);
-    // Ustawienie wielkości okna okna widoku (viewport) w zależności
-    // relacji pomiędzy wysokością i szerokością okna
+    // Ustawienie parametrów dla rzutu perspektywicznego:
+    // 70 stopni pola widzenia w osi y
+    // proporcje między osią x i y, do uzyskania pola widzenia w osi x
+    // minimalna odległość od obserwatora
+    // maksymalna odległość od obserwatora
+    float aspectRatio = (float)horizontal / (float)vertical;
+    gluPerspective(70, aspectRatio, 1.0, 30.0);
 
     glMatrixMode(GL_MODELVIEW);
-    // Przełączenie macierzy bieżącej na macierz widoku modelu
-
     glLoadIdentity();
-    // Czyszczenie macierzy bieżącej
 }
 
 void keyPressed(unsigned char key, int x, int y) {
@@ -542,6 +430,8 @@ void keyPressed(unsigned char key, int x, int y) {
     case 'w': model = 2; break;
     case 's': model = 3; break;
     case 'c': model = 4; break;
+
+    case 'n': drawNormals = !drawNormals;
     
     default:
         break;
@@ -564,7 +454,8 @@ void init() {
     float mat_shininess  = {20.0};
 
 
-    float light_ambient[] = {0.1, 0.1, 0.1, 1.0};
+    float light_ambient[] = {0.1, 0.0, 0.0, 1.0};
+    float light_ambient2[] = {0.0, 0.0, 0.1, 1.0};
     // składowe intensywności świecenia źródła światła otoczenia
     // Ia = [Iar,Iag,Iab]
 
@@ -591,8 +482,6 @@ void init() {
     // odległości od źródła
 
     // Ustawienie patrametrów materiału
-
-
     glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
     glMaterialfv(GL_FRONT, GL_AMBIENT, mat_ambient);
     glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
@@ -603,10 +492,10 @@ void init() {
 
     glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
 
     float pos[4] = {0.0, 0.0, 0.0, 1.0};
     angles_to_coords(light0Angles, pos);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
     glLightfv(GL_LIGHT0, GL_POSITION, pos);
 
     glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, att_constant);
@@ -614,9 +503,10 @@ void init() {
     glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, att_quadratic);
 
 
-    glLightfv(GL_LIGHT1, GL_AMBIENT, light_ambient);
+    glLightfv(GL_LIGHT1, GL_AMBIENT, light_ambient2);
     glLightfv(GL_LIGHT1, GL_DIFFUSE, light_diffuse2);
     glLightfv(GL_LIGHT1, GL_SPECULAR, light_specular);
+
     angles_to_coords(light1Angles, pos);
     glLightfv(GL_LIGHT1, GL_POSITION, pos);
 
@@ -628,21 +518,26 @@ void init() {
 
     glShadeModel(GL_SMOOTH); // właczenie łagodnego cieniowania
     glEnable(GL_LIGHT0);     // włączenie źródła o numerze 0
-    glEnable(GL_LIGHT1);     // włączenie źródła o numerze 0
+    glEnable(GL_LIGHT1);     // włączenie źródła o numerze 1
     glEnable(GL_DEPTH_TEST); // włączenie mechanizmu z-bufora
 }
 
 int main(int argc, char** argv) {
     printf("Grafika komputerowa lab5: OpenGL - oświetlenie\n");
     printf("Autor: Marcel Guzik\n\n");
-    printf("1 - światło czerwone\n");
-    printf("2 - światło niebieskie\n");
-    printf("3 - pozycja obserwatora\n\n");
+    printf("mysz:\n");
+    printf("\tLPM - przesuwa po powierzchni jaja\n");
+    printf("\tPPM - oddala/przybliża do powierzchni jaja\n");
+    printf("Wybor obiektu do przesuwania\n");
+    printf("\t1 - światło czerwone\n");
+    printf("\t2 - światło niebieskie\n");
+    printf("\t3 - pozycja obserwatora\n");
     printf("modele:\n");
     printf("\tp - jajo, siatka punktów\n");
     printf("\tw - jajo, widok szkieletu (wireframe)\n");
     printf("\ts - jajo, kolorowa siatka trójkątów\n");
     printf("\tc - czajnik\n");
+    printf("n - rysuj wektory normalne\n");
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB |GLUT_DEPTH);
@@ -650,7 +545,6 @@ int main(int argc, char** argv) {
     glutCreateWindow("Grafika komputerowa lab4 - Marcel Guzik");
 
     generateEggVerticesWithNormals(N);
-    generateColours(N);
 
     init();
 
@@ -660,11 +554,8 @@ int main(int argc, char** argv) {
     glutMotionFunc(mouseMoved);
     glutKeyboardFunc(keyPressed);
 
-
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glEnable(GL_DEPTH_TEST);
-
-
     glutMainLoop();
 
+    return 0;
 }
