@@ -5,7 +5,7 @@
 #include <math.h>
 #include <stdbool.h>
 
-#define N 101
+#define N 27
 const float EPSILON = 0.000001;
 
 typedef float point3[3];
@@ -271,6 +271,8 @@ void generateEggVerticesWithNormals(int n) {
         for(int j = 0; j < n; ++j) {
             float v = j * step;
             float u_step = u;
+            if(v == 0.0) v += EPSILON;
+            if(v == 1.0) v -= EPSILON;
             float x = 0.0f, y = 0.0f, z = 0.0f;
             // oznacza OŚ-N(ormal)-(u/v)
             float xnu = 0.0f, xnv = 0.0f, ynu = 0.0f, ynv = 0.0f, znu = 0.0f, znv = 0.0f;

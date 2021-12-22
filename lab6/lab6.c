@@ -74,142 +74,86 @@ float fmodfp(float a, float b) {
 }
 
 
-GLbyte *LoadTGAImage(const char *FileName, GLint *ImWidth, GLint *ImHeight, GLint *ImComponents, GLenum *ImFormat)
-{
-
-/*************************************************************************************/
-
-// Struktura dla nagłówka pliku  TGA
-
-
-    #pragma pack(1)           
-    typedef struct                       
-    {
-        GLbyte    idlength;             
-        GLbyte    colormaptype;          
-        GLbyte    datatypecode;            
-        unsigned short    colormapstart; 
+GLbyte* LoadTGAImage(const char *FileName, GLint *ImWidth, GLint *ImHeight, GLint *ImComponents, GLenum *ImFormat) {
+    #pragma pack(1)
+    typedef struct {
+        GLbyte    idlength;
+        GLbyte    colormaptype;
+        GLbyte    datatypecode;
+        unsigned short    colormapstart;
         unsigned short    colormaplength;
-        unsigned char     colormapdepth;  
-        unsigned short    x_orgin;        
-        unsigned short    y_orgin;        
-        unsigned short    width;         
-        unsigned short    height;        
-        GLbyte    bitsperpixel;                  
-        GLbyte    descriptor;            
-    }TGAHEADER;
+        unsigned char     colormapdepth;
+        unsigned short    x_orgin;
+        unsigned short    y_orgin;
+        unsigned short    width;
+        unsigned short    height;
+        GLbyte    bitsperpixel;
+        GLbyte    descriptor;
+    } TGAHEADER;
     #pragma pack(8)
 
-    FILE *pFile;                   
-    TGAHEADER tgaHeader;           
-    unsigned long lImageSize;       
-    short sDepth;                   
-    GLbyte    *pbitsperpixel = NULL; 
+    FILE *pFile;
+    TGAHEADER tgaHeader;
+    unsigned long lImageSize;
+    short sDepth;
+    GLbyte    *pbitsperpixel = NULL;
 
-          
-/*************************************************************************************/ 
-
-// Wartości domyślne zwracane w przypadku błędu
-
-    *ImWidth = 0;               
+    // Wartości domyślne zwracane w przypadku błędu
+    *ImWidth = 0;
     *ImHeight = 0;
     *ImFormat = GL_BGR_EXT;
     *ImComponents = GL_RGB8;
-   
+
     pFile = fopen(FileName, "rb");
     if(pFile == NULL)
       return NULL;
 
-/*************************************************************************************/
-// Przeczytanie nagłówka pliku 
-
-
+    // Przeczytanie nagłówka pliku
     fread(&tgaHeader, sizeof(TGAHEADER), 1, pFile);
-                
 
-/*************************************************************************************/
-
-// Odczytanie szerokości, wysokości i głębi obrazu
-
+    // Odczytanie szerokości, wysokości i głębi obrazu
     *ImWidth = tgaHeader.width;
     *ImHeight = tgaHeader.height;
     sDepth = tgaHeader.bitsperpixel / 8;
 
-
-/*************************************************************************************/
-// Sprawdzenie, czy głębia spełnia założone warunki (8, 24, lub 32 bity)
-   
+    // Sprawdzenie, czy głębia spełnia założone warunki (8, 24, lub 32 bity)
     if(tgaHeader.bitsperpixel != 8 && tgaHeader.bitsperpixel != 24 && tgaHeader.bitsperpixel != 32)
         return NULL;
 
-/*************************************************************************************/
-
-// Obliczenie rozmiaru bufora w pamięci
-
-
+    // Obliczenie rozmiaru bufora w pamięci
     lImageSize = tgaHeader.width * tgaHeader.height * sDepth;
 
+    // Alokacja pamięci dla danych obrazu
+    pbitsperpixel = (GLbyte*)malloc(lImageSize * sizeof(GLbyte));
 
-/*************************************************************************************/   
-
-// Alokacja pamięci dla danych obrazu
-
-
-     pbitsperpixel = (GLbyte*)malloc(lImageSize * sizeof(GLbyte));
-   
-      if(pbitsperpixel == NULL)
+    if(pbitsperpixel == NULL)
         return NULL;
 
-    if(fread(pbitsperpixel, lImageSize, 1, pFile) != 1)
-        {
+    if(fread(pbitsperpixel, lImageSize, 1, pFile) != 1) {
         free(pbitsperpixel);
         return NULL;
-        }
-   
-
-/*************************************************************************************/
+    }
 
 // Ustawienie formatu OpenGL
+    switch(sDepth) {
+    case 3:
+        *ImFormat = GL_BGR_EXT;
+        *ImComponents = GL_RGB8;
+        break;
 
+    case 4:
+        *ImFormat = GL_BGRA_EXT;
+        *ImComponents = GL_RGBA8;
+        break;
 
-    switch(sDepth)
-
-        {
-
-        case 3:    
-
-            *ImFormat = GL_BGR_EXT;
-
-            *ImComponents = GL_RGB8;
-
-            break;
-
-        case 4:
-
-            *ImFormat = GL_BGRA_EXT;
-
-            *ImComponents = GL_RGBA8;
-
-            break;
-
-        case 1:
-
-            *ImFormat = GL_LUMINANCE;
-
-            *ImComponents = GL_LUMINANCE8;
-
-            break;
-
-        };
-
-     
+    case 1:
+        *ImFormat = GL_LUMINANCE;
+        *ImComponents = GL_LUMINANCE8;
+        break;
+    };
 
     fclose(pFile);
-
-       
-
     return pbitsperpixel;
-
 }
 
 void angles_to_coords(float* angles, point3 coords) {
@@ -554,39 +498,77 @@ void generateEggVerticesWithNormals(int n) {
 void drawPyramid(float height) {
     glEnable(GL_CULL_FACE);
     glBegin(GL_QUADS);
-        glVertex3f(-2.0, -2.0, -2.0);
-        glVertex3f(2.0, -2.0, -2.0);
-        glVertex3f(2.0, -2.0, 2.0);
-        glVertex3f(-2.0, -2.0, 2.0);
+        glTexCoord2f(0.0f, 0.0f);
+        glNormal3f(0.0f, -1.0f, 0.0f);
+        glVertex3f(-2.0, 0.0, -2.0);
+
+        glTexCoord2f(1.0f, 0.0f);
+        glNormal3f(0.0f, -1.0f, 0.0f);
+        glVertex3f(2.0, 0.0, -2.0);
+
+        glTexCoord2f(1.0f, 1.0f);
+        glNormal3f(0.0f, -1.0f, 0.0f);
+        glVertex3f(2.0, 0.0, 2.0);
+
+        glTexCoord2f(0.0f, 1.0f);
+        glNormal3f(0.0f, -1.0f, 0.0f);
+        glVertex3f(-2.0, 0.0, 2.0);
     glEnd();
 
     glBegin(GL_TRIANGLES);
+        float normal[] = {2 * height, 4.0f, 0.0f};
+        float norLen = sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+        normal[0] /= norLen;
+        normal[1] /= norLen;
+        normal[2] /= norLen;
+
         glTexCoord2f(0.0f, 0.0f);
-        glVertex3f(2.0, -2.0, 2.0);
+        glNormal3fv(normal);
+        glVertex3f(2.0, 0.0, 2.0);
         glTexCoord2f(0.25f, 0.0f);
-        glVertex3f(2.0, -2.0, -2.0);
+        glNormal3fv(normal);
+        glVertex3f(2.0, 0.0, -2.0);
         glTexCoord2f(0.125f, 1.0f);
+        glNormal3fv(normal);
         glVertex3f(0.0, height, 0.0);
-        
+
+        normal[0] = 0.0f;
+        normal[2] = 2 * height / norLen;
+
         glTexCoord2f(0.25f, 0.0f);
-        glVertex3f(-2.0, -2.0, 2.0);
+        glNormal3fv(normal);
+        glVertex3f(-2.0, 0.0, 2.0);
         glTexCoord2f(0.5f, 0.0f);
-        glVertex3f(2.0, -2.0, 2.0);
+        glNormal3fv(normal);
+        glVertex3f(2.0, 0.0, 2.0);
         glTexCoord2f(0.375f, 1.0f);
+        glNormal3fv(normal);
         glVertex3f(0.0, height, 0.0);
+
+        normal[0] = -2 * height / norLen;
+        normal[2] = 0.0f;
 
         glTexCoord2f(0.5f, 0.0f);
-        glVertex3f(-2.0, -2.0, -2.0);
+        glNormal3fv(normal);
+        glVertex3f(-2.0, 0.0, -2.0);
         glTexCoord2f(0.75f, 0.0f);
-        glVertex3f(-2.0, -2.0, 2.0);
+        glNormal3fv(normal);
+        glVertex3f(-2.0, 0.0, 2.0);
         glTexCoord2f(0.625f, 1.0f);
+        glNormal3fv(normal);
         glVertex3f(0.0, height, 0.0);
 
+        normal[0] = 0.0f;
+        normal[2] = -2 * height / norLen;
+
         glTexCoord2f(0.75f, 0.0f);
-        glVertex3f(2.0, -2.0, -2.0);
+        glNormal3fv(normal);
+        glVertex3f(2.0, 0.0, -2.0);
         glTexCoord2f(1.0f, 0.0f);
-        glVertex3f(-2.0, -2.0, -2.0);
+        glNormal3fv(normal);
+        glVertex3f(-2.0, 0.0, -2.0);
         glTexCoord2f(0.875f, 1.0f);
+        glNormal3fv(normal);
         glVertex3f(0.0, height, 0.0);
     glEnd();
     glDisable(GL_CULL_FACE);
@@ -622,10 +604,10 @@ void renderScene(void) {
     else if(model == 4) drawEggTextured(N);
     else if(model == 5) glutSolidTeapot(3.0);
     else if(model == 6) {
-        glDisable(GL_LIGHTING);
-        drawPyramid(2.0f);
-        glEnable(GL_LIGHTING);
-    } 
+        float height = 3.0f;
+        glTranslatef(0.0f, -height/2, 0.0f);
+        drawPyramid(height);
+    }
 
     glFlush();
     glutSwapBuffers();
@@ -671,7 +653,7 @@ void keyPressed(unsigned char key, int x, int y) {
     case 'v': model = 6; break;
 
     case 'n': drawNormals = !drawNormals;
-    
+
     default:
         break;
     }
@@ -682,14 +664,12 @@ void keyPressed(unsigned char key, int x, int y) {
 void init() {
     GLint ImWidth, ImHeight, ImComponents;
     GLenum ImFormat;
-
     GLbyte* texture = LoadTGAImage("tekstury/P4_t.tga", &ImWidth, &ImHeight, &ImComponents, &ImFormat);
     glTexImage2D(GL_TEXTURE_2D, 0, ImComponents, ImWidth, ImHeight, 0, ImFormat, GL_UNSIGNED_BYTE, texture);
     glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     free(texture);
-
 
     // współczynniki ka =[kar,kag,kab] dla światła otoczenia
     float mat_ambient[]  = {1.0, 1.0, 1.0, 1.0};
@@ -737,9 +717,7 @@ void init() {
     glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
     glMaterialf(GL_FRONT, GL_SHININESS, mat_shininess);
 
-/*************************************************************************************/
-// Ustawienie parametrów źródła
-
+    // Ustawienie parametrów źródła
     glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
     glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
@@ -763,37 +741,37 @@ void init() {
     glLightf(GL_LIGHT1, GL_CONSTANT_ATTENUATION, att_constant);
     glLightf(GL_LIGHT1, GL_LINEAR_ATTENUATION, att_linear);
     glLightf(GL_LIGHT1, GL_QUADRATIC_ATTENUATION, att_quadratic);
-/*************************************************************************************/
-// Ustawienie opcji systemu oświetlania sceny
 
-    glShadeModel(GL_SMOOTH); // właczenie łagodnego cieniowania
-    glEnable(GL_LIGHT0);     // włączenie źródła o numerze 0
-    glEnable(GL_LIGHT1);     // włączenie źródła o numerze 1
-    glEnable(GL_DEPTH_TEST); // włączenie mechanizmu z-bufora
+    // Ustawienie opcji systemu oświetlania sceny
+    glShadeModel(GL_SMOOTH);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_LIGHT1);
+    glEnable(GL_DEPTH_TEST);
     glEnable(GL_TEXTURE_2D);
 }
 
 int main(int argc, char** argv) {
-    printf("Grafika komputerowa lab5: OpenGL - oświetlenie\n");
+    printf("Grafika komputerowa lab6: OpenGL - teksturowanie\n");
     printf("Autor: Marcel Guzik\n\n");
     printf("mysz:\n");
     printf("\tLPM - przesuwa po powierzchni jaja\n");
-    printf("\tPPM - oddala/przybliża do powierzchni jaja\n");
+    printf("\tPPM - oddala/przybliza do powierzchni jaja\n");
     printf("Wybor obiektu do przesuwania\n");
-    printf("\t1 - światło czerwone\n");
-    printf("\t2 - światło niebieskie\n");
+    printf("\t1 - swiatlo czerwone\n");
+    printf("\t2 - swiatlo niebieskie\n");
     printf("\t3 - pozycja obserwatora\n");
     printf("modele:\n");
-    printf("\tp - jajo, siatka punktów\n");
+    printf("\tp - jajo, siatka punktow\n");
     printf("\tw - jajo, widok szkieletu (wireframe)\n");
-    printf("\ts - jajo, kolorowa siatka trójkątów\n");
+    printf("\ts - jajo, kolorowa siatka trojkatow\n");
     printf("\tc - czajnik\n");
+    printf("\tv - piramida\n");
     printf("n - rysuj wektory normalne\n");
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB |GLUT_DEPTH);
     glutInitWindowSize(600, 600);
-    glutCreateWindow("Grafika komputerowa lab4 - Marcel Guzik");
+    glutCreateWindow("Grafika komputerowa lab6 - Marcel Guzik");
 
     generateEggVerticesWithNormals(N);
 
