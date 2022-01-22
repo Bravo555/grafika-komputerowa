@@ -1,0 +1,76 @@
+\documentclass[a4paper]{article}
+\usepackage[a4paper]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{polski}
+\usepackage[polish]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{verbatim}
+\usepackage{float}
+\usepackage{minted}
+\usepackage{microtype}
+\usepackage{shortvrb}
+\usepackage{amsmath}
+
+\let\olditemize=\itemize \let\endolditemize=\enditemize \renewenvironment{itemize}{\olditemize \itemsep0em}{\endolditemize}
+
+\title{TEMAT ĆWICZENIA: OpenGL – projekt systemu słonecznego}
+\author{Marcel Guzik}
+
+\begin{document}
+\section{Wprowadzenie}
+
+Celem ćwiczenia jest wykonanie projektu inkorporującego wszystkie techniki
+OpenGL poznane podczas kursu, wykonując interaktywny model systemu słonecznego.
+
+\section{Założenia projektu}
+
+Aplikacja realizująca interaktywny model systemu słonecznego powinna
+charakteryzować się następującymi cechami:
+
+\begin{itemize}
+    \item Implementować realistyczny system oświetlenia przez oświetlanie i
+          cieniowanie Phonga
+    \item Pokazywać relatywnie dokładne powierzchnie planet dzięki użyciu
+          tekstur (użyć minimalnie tekstury koloru oraz tekstury normalnych)
+          Dodatkowo, zapewnić odpowiednie kolory, tj. brać pod uwagę mechanizm
+          korekcji gamma używany w przestrzeni kolorów sRGB. Należy zatem
+          zwrócić uwagę czy wczytywane tekstury mają zaaplikowaną korekcję
+          gamma, i jeśli tak przekształcić je do liniowej przestrzeni kolorów
+          dla celów wyliczeń światła. Finalna korekcja gamma zostanie wykonana
+          przez aplikację na gotowej do wyświetlenia klatce.
+    \item Udostępniać wybór użytkownikowi między realistyczną a poglądową skalą
+    \item Zapewniać intuicyjne sterowanie kamerą
+    \item Poruszać planetami wg. ich orbit dookoła słońca, które nie są
+          dokładnymi okręgami lecz elipsami, którą również należy wyświetlić
+          użytkownikowi
+    \item Zapewnić kontrolę czasu by przyśpieszać lub spowalniać obieg planet.
+\end{itemize}
+
+\section{Duże zmiany}
+
+\subsection{Zmiana używanej biblioteki użytkowej OpenGL z GLUT na GLFW}
+
+Biblioteka GLUT powstała dość dawno temu i w związku z tym posiada pewne
+znaczące ograniczenia projektowe. Nie jest już utrzymywana, a jej
+otwartoźródłowy port freeglut może dodawać nowe funkcjonalności, jednak musi
+zachowywać kompatybilność z oryginalną biblioteką, zatem w praktyce nie jest w
+stanie naprawić niektórych błędów GLUT.
+
+W związku z powyższym, zdecydowano się wykorzystać bibliotekę GLFW, która daje
+programiście większą kontrolę nad aplikacją, zapewnia więcej funkcjonalności,
+przykładowo:
+
+\begin{itemize}
+    \item W GLFW programista sam tworzy główną pętlę programu, gdzie w GLUT
+          programista musi wywołać funkcję glutMainLoop która nigdy nie zwraca.
+
+    \item GLFW zapewnia dostęp do ``surowych'' danych poruszeń myszą, tj.
+          nieprzeskalowanych i niezakcelerowanych zgodnie z ustawieniami
+          akceleracji kursora myszy. Jendakże przede wszystkim poruszenia myszką
+          wzdłuż obu osi są udostępniane jako liczba zmiennoprzecinkowa, dzięki
+          czemu poruszenia kamerą nie będą ``skokowe''.
+\end{itemize}
+
+
+\end{document}
