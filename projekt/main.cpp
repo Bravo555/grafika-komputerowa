@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cmath>
-#include <GL/gl.h>
+#include <iostream>
+#include <GLFW/glfw3.h>
 #include <GL/glut.h>
 
 const float EPSILON = 0.000001;
@@ -46,15 +47,12 @@ void angles_to_coords(float* angles, point3 coords) {
 }
 
 // Funkcja "bada" stan myszy i ustawia wartości odpowiednich zmiennych globalnych
-void mousePressed(int btn, int state, int x, int y) {
+void mousePressed(GLFWwindow* window, int btn, int state, int mods) {
     // przypisanie aktualnie odczytanej pozycji kursora jako pozycji poprzedniej
-    x_pos_old = x;
-    y_pos_old = y;
-
-    if(btn==GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+    if(btn == GLFW_MOUSE_BUTTON_LEFT && state == GLFW_PRESS) {
         status = 1;          // wcięnięty został lewy klawisz myszy
     }
-    else if(btn == GLUT_RIGHT_BUTTON && state == GLUT_DOWN) {
+    else if(btn == GLFW_MOUSE_BUTTON_RIGHT && state == GLFW_PRESS) {
         status = 2;
     }
     else {
@@ -62,7 +60,7 @@ void mousePressed(int btn, int state, int x, int y) {
     }
 }
 
-void mouseMoved(GLsizei x, GLsizei y) {
+void mouseMoved(GLFWwindow* window, double x, double y) {
     // obliczenie różnicy położenia kursora myszy i podstawienie bieżącego
     // położenia jako poprzednie
     delta_x = x - x_pos_old;
@@ -89,7 +87,6 @@ void mouseMoved(GLsizei x, GLsizei y) {
     }
 
     // przerysowanie obrazu sceny
-    glutPostRedisplay();
 }
 
 // Funkcja rysująca osie układu współrzędnych
@@ -125,7 +122,7 @@ void glTranslatefv(float arr[]) {
     return glTranslatef(arr[0], arr[1], arr[2]);
 }
 
-void renderScene(void) {
+void renderScene(GLFWwindow* window) {
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -154,10 +151,10 @@ void renderScene(void) {
     glutSolidSphere(ear_size, 100, 100);
 
     glFlush();
-    glutSwapBuffers();
+    glfwSwapBuffers(window);
 }
 
-void changeSize(int horizontal, int vertical) {
+void changeSize(GLFWwindow* window, int horizontal, int vertical) {
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
 
@@ -173,7 +170,9 @@ void changeSize(int horizontal, int vertical) {
     gluPerspective(70, aspectRatio, 1.0, 100000.0);
 }
 
-void keyPressed(unsigned char key, int x, int y) {
+void keyPressed(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
 void init() {
@@ -181,22 +180,53 @@ void init() {
     glEnable(GL_DEPTH_TEST);
 }
 
+void errorCallback(int error, const char* desc) {
+    std::cerr << "GLFW error: " << desc << std::endl;
+}
+
 int main(int argc, char** argv) {
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB |GLUT_DEPTH);
-    glutInitWindowSize(600, 600);
-    glutCreateWindow("GK lab7: projekt ukladu slonecznego - Marcel Guzik");
+    glfwSetErrorCallback(errorCallback);
+
+    if(!glfwInit()) {
+        std::cerr << "Error initializing glfw" << std::endl;
+        return -1;
+    }
+
+    GLFWwindow* window = glfwCreateWindow(800, 600, "GK lab7: projekt ukladu slonecznego - Marcel Guzik", NULL, NULL);
+    if (!window) {
+        // Window or OpenGL context creation failed
+        std::cerr << "Error initializing window" << std::endl;
+        return -2;
+    }
+
+    glfwMakeContextCurrent(window);
 
     init();
 
-    glutDisplayFunc(renderScene);
-    glutReshapeFunc(changeSize);
-    glutMouseFunc(mousePressed);
-    glutMotionFunc(mouseMoved);
-    glutKeyboardFunc(keyPressed);
+    glfwSetKeyCallback(window, keyPressed);
+    glfwSetFramebufferSizeCallback(window, changeSize);
+    glfwSetCursorPosCallback(window, mouseMoved);
+    glfwSetMouseButtonCallback(window, mousePressed);
 
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glutMainLoop();
+    if(glfwRawMouseMotionSupported())
+        glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
 
+    while(!glfwWindowShouldClose(window)) {
+        // Keep running
+        /* Render here */
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        renderScene(window);
+
+        /* Swap front and back buffers */
+        glfwSwapBuffers(window);
+
+        /* Poll for and process events */
+        glfwPollEvents();
+    }
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
     return 0;
 }
