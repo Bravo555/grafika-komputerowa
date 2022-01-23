@@ -2,7 +2,7 @@
 #include <cmath>
 #include <iostream>
 #include <GLFW/glfw3.h>
-#include <GL/glut.h>
+#include <GL/glu.h>
 
 const float EPSILON = 0.000001;
 
@@ -18,12 +18,12 @@ static float zstep = 0.1;
 static GLint status = 0;
 
 // poprzednia pozycja kursora myszy
-static int x_pos_old = 0;
-static int y_pos_old = 0;
+double x_pos_old = 0;
+double y_pos_old = 0;
 
 // różnica pomiędzy pozycją bieżącą i poprzednią kursora myszy
-static int delta_x = 0;
-static int delta_y = 0;
+double delta_x = 0;
+double delta_y = 0;
 angles viewerAngles = {0.0, 0.5 * M_PI, 10.0};
 
 float clamp(float d, float min, float max) {
@@ -49,14 +49,19 @@ void angles_to_coords(float* angles, point3 coords) {
 // Funkcja "bada" stan myszy i ustawia wartości odpowiednich zmiennych globalnych
 void mousePressed(GLFWwindow* window, int btn, int state, int mods) {
     // przypisanie aktualnie odczytanej pozycji kursora jako pozycji poprzedniej
-    if(btn == GLFW_MOUSE_BUTTON_LEFT && state == GLFW_PRESS) {
-        status = 1;          // wcięnięty został lewy klawisz myszy
+    if(state == GLFW_PRESS) {
+        // glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+        if(btn == GLFW_MOUSE_BUTTON_LEFT) {
+            status = 1;          // wcięnięty został lewy klawisz myszy
+        }
+        else if(btn == GLFW_MOUSE_BUTTON_RIGHT) {
+            status = 2;
+        }
     }
-    else if(btn == GLFW_MOUSE_BUTTON_RIGHT && state == GLFW_PRESS) {
-        status = 2;
-    }
-    else {
-        status = 0;          // nie został wcięnięty żaden klawisz
+    else if(state == GLFW_RELEASE) {
+        // glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        status = 0;
     }
 }
 
@@ -68,6 +73,10 @@ void mouseMoved(GLFWwindow* window, double x, double y) {
 
     delta_y = y - y_pos_old;
     y_pos_old = y;
+
+    if(delta_x != 0 || delta_y != 0) {
+        std::cout << delta_x << " " << delta_y << std::endl;
+    }
 
     if(status == 1) {
         float new_elevation, new_azimuth;
@@ -127,7 +136,6 @@ void renderScene(GLFWwindow* window) {
     glLoadIdentity();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
     float sun_pos[] = {0.0, 0.0, 0.0};
     float sun_size = 0.5;
 
@@ -142,13 +150,18 @@ void renderScene(GLFWwindow* window) {
     angles_to_coords(viewerAngles, viewer_pos);
 
     gluLookAt(viewer_pos[0], viewer_pos[1], viewer_pos[2], 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-    glColor3f(1.0f, 1.0f, 0.0f);
-    glutSolidSphere(sun_size, 100, 100);
 
+    Axes();
+
+    glColor3f(1.0f, 1.0f, 0.0f);
+    GLUquadric* quadric = gluNewQuadric();
+    gluSphere(quadric, sun_size, 100, 100);
+
+    glLoadIdentity();
     gluLookAt(viewer_pos[0], viewer_pos[1], viewer_pos[2], 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
     glTranslatefv(ear_pos);
     glColor3f(0.0f, 0.0f, 1.0f);
-    glutSolidSphere(ear_size, 100, 100);
+    gluSphere(quadric, ear_size, 100, 100);
 
     glFlush();
     glfwSwapBuffers(window);
@@ -175,9 +188,13 @@ void keyPressed(GLFWwindow* window, int key, int scancode, int action, int mods)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
-void init() {
+void init(GLFWwindow* window) {
     glShadeModel(GL_SMOOTH);
     glEnable(GL_DEPTH_TEST);
+
+    int width, height;
+    glfwGetFramebufferSize(window, &width, &height);
+    changeSize(window, width, height);
 }
 
 void errorCallback(int error, const char* desc) {
@@ -185,7 +202,6 @@ void errorCallback(int error, const char* desc) {
 }
 
 int main(int argc, char** argv) {
-    glutInit(&argc, argv);
     glfwSetErrorCallback(errorCallback);
 
     if(!glfwInit()) {
@@ -202,25 +218,25 @@ int main(int argc, char** argv) {
 
     glfwMakeContextCurrent(window);
 
-    init();
+    init(window);
+
+    bool rawMouse = glfwRawMouseMotionSupported();
+    std::cout << "raw mouse supported: " << rawMouse << std::endl;
+    if(rawMouse) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+    }
 
     glfwSetKeyCallback(window, keyPressed);
     glfwSetFramebufferSizeCallback(window, changeSize);
     glfwSetCursorPosCallback(window, mouseMoved);
     glfwSetMouseButtonCallback(window, mousePressed);
 
-    if(glfwRawMouseMotionSupported())
-        glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+
+    // glfwSwapInterval(1);
 
     while(!glfwWindowShouldClose(window)) {
-        // Keep running
-        /* Render here */
-        glClear(GL_COLOR_BUFFER_BIT);
-
         renderScene(window);
-
-        /* Swap front and back buffers */
-        glfwSwapBuffers(window);
 
         /* Poll for and process events */
         glfwPollEvents();
