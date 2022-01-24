@@ -30,7 +30,9 @@ struct Planet {
     float color[4];
     float size;
     GLbyte* texture;
+    float rotationRate;
     point3 position;
+    float rotationY;
 };
 
 float lightPos[4] = {0.0, 0.0, 0.0, 1.0};
@@ -39,7 +41,7 @@ int focusedBodyIndex = 0;
 
 std::vector<Planet> planets;
 
-static float zstep = 0.1;
+float zstep = 0.01;
 
 // stan klawiszy myszy
 // 0 - nie naciśnięto żadnego klawisza
@@ -62,6 +64,8 @@ GLbyte* sunTex;
 GLbyte* merTex;
 GLbyte* venTex;
 GLbyte* earTex;
+
+GLuint textures[9];
 
 std::chrono::_V2::steady_clock::time_point lastTime;
 
@@ -89,6 +93,11 @@ void positionFromTime(float distance, float orbPeriod, point3 position) {
 
     position[0] = x;
     position[2] = z;
+}
+
+void rotationFromTime(Planet& planet) {
+    if(planet.rotationRate == 0.0) return;
+    planet.rotationY = fmodf((simCurrentDay / planet.rotationRate) * 360.0, 360.0);
 }
 
 void angles_to_coords(float* angles, point3 coords) {
@@ -137,7 +146,7 @@ void mouseMoved(GLsizei x, GLsizei y) {
         }
     }
     else if(status == 2) {
-        viewerAngles[2] = clamp(viewerAngles[2] + delta_y * zstep, 0.01, 100.0);
+        viewerAngles[2] = clamp(viewerAngles[2] * (1.0 + delta_y * zstep), 0.01, 100.0);
     }
 }
 
@@ -174,14 +183,6 @@ void glTranslatefv(float arr[]) {
     return glTranslatef(arr[0], arr[1], arr[2]);
 }
 
-void setTexture(GLbyte* tex) {
-    glActiveTexture(GL_TEXTURE1);
-    glTexImage2D(GL_TEXTURE_2D, 0, components, width, height, 0, format, GL_UNSIGNED_BYTE, tex);
-    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-}
-
 // a gluLookAt wrapper that takes arguments as structs
 void lookAtp3(point3 viewer, point3 center, point3 up) {
     gluLookAt(viewer[0], viewer[1], viewer[2], center[0], center[1], center[2], up[0], up[1], up[2]);
@@ -190,10 +191,10 @@ void lookAtp3(point3 viewer, point3 center, point3 up) {
 void renderScene() {
     // update simulation timestep
     auto currentTime = std::chrono::steady_clock::now();
-    uint64_t timeElapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastTime).count();
+    uint64_t timeElapsedUs = std::chrono::duration_cast<std::chrono::microseconds>(currentTime - lastTime).count();
     lastTime = currentTime;
 
-    double timeElapsedS = (double)timeElapsedMs / 1000.0;
+    double timeElapsedS = (double)timeElapsedUs / 1000000.0;
     double simDaysElapsed = timeScale * timeElapsedS;
     simCurrentDay += simDaysElapsed;
 
@@ -201,10 +202,10 @@ void renderScene() {
     glLoadIdentity();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glDisable(GL_LIGHTING);
-    GLUquadric* quadric = gluNewQuadric();
 
     for(auto& planet: planets) {
         positionFromTime(planet.distance, planet.orbPeriodDays, planet.position);
+        rotationFromTime(planet);
     }
 
     float* focusedPlanet = planets[focusedBodyIndex].position;
@@ -220,34 +221,35 @@ void renderScene() {
     glLoadIdentity();
     lookAtp3(viewerPos, focusedPlanet, up);
 
+    glDisable(GL_TEXTURE_2D);
     axes();
+    glEnable(GL_TEXTURE_2D);
 
-    glEnable(GL_LIGHTING);
-    glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
-    for(auto& planet: planets) {
-        glDisable(GL_TEXTURE_2D);
+    for(int i = 0; i < planets.size(); ++i) {
+        auto& planet = planets.at(i);
+        GLUquadric* quadric = gluNewQuadric();
+
+        glEnable(GL_LIGHTING);
+        glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
         glLoadIdentity();
         lookAtp3(viewerPos, focusedPlanet, up);
-
         glTranslatefv(planet.position);
+        glRotatef(planet.rotationY, 0.0f, 1.0f, 0.0f);
 
         if(planet.distance == 0.0) {
             glDisable(GL_LIGHTING);
             glColor4fv(planet.color);
         }
 
-
         if(planet.texture) {
             glEnable(GL_TEXTURE_2D);
-            setTexture(planet.texture);
+            glBindTexture(GL_TEXTURE_2D, textures[i]);
             glRotatef(angle, 1.0f, 0.0f, 0.0f);
             gluQuadricTexture(quadric, true);
-            glDisable(GL_TEXTURE_2D);
         }
 
         gluSphere(quadric, planet.size, 100, 100);
         gluQuadricTexture(quadric, false);
-        glEnable(GL_LIGHTING);
     }
 
 
@@ -275,15 +277,6 @@ void changeSize(int horizontal, int vertical) {
 
 void keyPressed(unsigned char key, int x, int y) {
     switch(key) {
-    case 'q':
-        angle -= 1.0f;
-        std::cout << angle << std::endl;
-        break;
-    case 'e':
-        angle += 1.0f;
-        std::cout << angle << std::endl;
-        break;
-
     case 'p':
         timeScale *= 2.0;
         break;
@@ -293,12 +286,10 @@ void keyPressed(unsigned char key, int x, int y) {
 
     case 'x':
         focusedBodyIndex = (focusedBodyIndex + 1) % planets.size();
-        std::cout << focusedBodyIndex << std::endl;
         break;
     case 'z':
         focusedBodyIndex -= 1;
         if(focusedBodyIndex < 0) focusedBodyIndex = planets.size() - 1;
-        std::cout << focusedBodyIndex << std::endl;
         break;
     }
     glutPostRedisplay();
@@ -362,6 +353,8 @@ void init() {
     glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, att_linear);
     glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, att_quadratic);
 
+    glEnable(GL_LIGHT0);
+
     planets = {
         // sun
         {
@@ -369,7 +362,8 @@ void init() {
             1,
             {1.0, 1.0, 1.0, 1.0},
             0.5,
-            LoadTGAImage("textures/sun_f.tga", &width, &height, &components, &format)
+            LoadTGAImage("textures/sun_f.tga", &width, &height, &components, &format),
+            0.0
         },
 
         // mercury
@@ -378,7 +372,8 @@ void init() {
             115,
             {0.2, 0.2, 0.2, 1.0},
             0.048,
-            LoadTGAImage("textures/mercury_f.tga", &width, &height, &components, &format)
+            LoadTGAImage("textures/mercury_f.tga", &width, &height, &components, &format),
+            176.0
         },
 
         // venus
@@ -387,7 +382,8 @@ void init() {
             224,
             {0.8, 0.8, 0.8, 1.0},
             0.060,
-            LoadTGAImage("textures/venus_f.tga", &width, &height, &components, &format)
+            LoadTGAImage("textures/venus_f.tga", &width, &height, &components, &format),
+            116.0
         },
 
         // earth
@@ -396,7 +392,8 @@ void init() {
             365,
             {0.0, 0.0, 1.0, 1.0},
             0.064,
-            LoadTGAImage("textures/earth_f.tga", &width, &height, &components, &format)
+            LoadTGAImage("textures/earth_f.tga", &width, &height, &components, &format),
+            1.0
         },
 
         // mars
@@ -405,56 +402,81 @@ void init() {
             779,
             {0.6, 0.2, 0.0, 1.0},
             0.034,
-            LoadTGAImage("textures/mars_f.tga", &width, &height, &components, &format)
+            LoadTGAImage("textures/mars_f.tga", &width, &height, &components, &format),
+            1.025
         },
 
         // jupiter
         {
             3.2,
-            1000,
+            4332,
             {1.0, 1.0, 1.0, 1.0},
             0.1,
-            LoadTGAImage("textures/jupiter_f.tga", &width, &height, &components, &format)
+            LoadTGAImage("textures/jupiter_f.tga", &width, &height, &components, &format),
+            0.41
         },
 
         // saturn
         {
             4.2,
-            1200,
+            10759,
             {1.0, 1.0, 1.0, 1.0},
             0.1,
-            LoadTGAImage("textures/saturn_f.tga", &width, &height, &components, &format)
+            LoadTGAImage("textures/saturn_f.tga", &width, &height, &components, &format),
+            0.43
         },
 
         // uranus
         {
             5.2,
-            1400,
+            30688,
             {1.0, 1.0, 1.0, 1.0},
             0.1,
-            LoadTGAImage("textures/uranus_f.tga", &width, &height, &components, &format)
+            LoadTGAImage("textures/uranus_f.tga", &width, &height, &components, &format),
+            0.718
         },
 
         // neptune
         {
             6.2,
-            1600,
+            60195,
             {1.0, 1.0, 1.0, 1.0},
             0.1,
-            LoadTGAImage("textures/neptune_f.tga", &width, &height, &components, &format)
+            LoadTGAImage("textures/neptune_f.tga", &width, &height, &components, &format),
+            0.671
         },
 
     };
 
-    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
+    glGenTextures(9, textures);
+
+    // gen textures
+    for(int i = 0; i < planets.size(); ++i) {
+        glBindTexture(GL_TEXTURE_2D, textures[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, components, width, height, 0, format, GL_UNSIGNED_BYTE, planets[i].texture);
+        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    }
 }
 
 int main(int argc, char** argv) {
+    std::string title = "GK lab7: projekt ukladu slonecznego - Marcel Guzik";
+
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB |GLUT_DEPTH);
     glutInitWindowSize(640, 480);
-    glutCreateWindow("GK lab7: projekt ukladu slonecznego - Marcel Guzik");
+    glutCreateWindow(title.c_str());
+
+    std::cout << title << std::endl;
+
+    std::cout << "Klawisze:" << std::endl;
+    std::cout << "\tz, x: wycentruj kamerę na roznych cialach niebieskich" << std::endl;
+    std::cout << "\tp, l: przyspieszaj i zwalniaj czas (startowa predkosc to 365 dni symulacji na minute)" << std::endl;
+
+    std::cout << "Mysz:" << std::endl;
+    std::cout << "\tLPM: obraca kamere dookola aktualnie wycentrowanego obiektu" << std::endl;
+    std::cout << "\tPPM: zmiana odleglosc kamery od aktualnie wycentrowanego obiektu" << std::endl;
 
     init();
 

@@ -23,54 +23,45 @@
 Celem ćwiczenia jest wykonanie projektu inkorporującego wszystkie techniki
 OpenGL poznane podczas kursu, wykonując interaktywny model systemu słonecznego.
 
-\section{Założenia projektu}
+\begin{figure}[H]
+      \centering
+      \includegraphics[width=0.3\textwidth]{img/1}
+      \includegraphics[width=0.3\textwidth]{img/2}
+      \includegraphics[width=0.3\textwidth]{img/3}
+      \caption{Kopie widoku okna programu przedstawiające słońce, planety układu
+            słonecznego oraz zbliżenie na Ziemię}
+\end{figure}
 
-Aplikacja realizująca interaktywny model systemu słonecznego powinna
-charakteryzować się następującymi cechami:
+\section{Zakres projektu}
 
-\begin{itemize}
-    \item Implementować realistyczny system oświetlenia przez oświetlanie i
-          cieniowanie Phonga
-    \item Pokazywać relatywnie dokładne powierzchnie planet dzięki użyciu
-          tekstur (użyć minimalnie tekstury koloru oraz tekstury normalnych)
-          Dodatkowo, zapewnić odpowiednie kolory, tj. brać pod uwagę mechanizm
-          korekcji gamma używany w przestrzeni kolorów sRGB. Należy zatem
-          zwrócić uwagę czy wczytywane tekstury mają zaaplikowaną korekcję
-          gamma, i jeśli tak przekształcić je do liniowej przestrzeni kolorów
-          dla celów wyliczeń światła. Finalna korekcja gamma zostanie wykonana
-          przez aplikację na gotowej do wyświetlenia klatce.
-    \item Udostępniać wybór użytkownikowi między realistyczną a poglądową skalą
-    \item Zapewniać intuicyjne sterowanie kamerą
-    \item Poruszać planetami wg. ich orbit dookoła słońca, które nie są
-          dokładnymi okręgami lecz elipsami, którą również należy wyświetlić
-          użytkownikowi
-    \item Zapewnić kontrolę czasu by przyśpieszać lub spowalniać obieg planet.
-\end{itemize}
-
-\section{Duże zmiany}
-
-\subsection{Zmiana używanej biblioteki użytkowej OpenGL z GLUT na GLFW}
-
-Biblioteka GLUT powstała dość dawno temu i w związku z tym posiada pewne
-znaczące ograniczenia projektowe. Nie jest już utrzymywana, a jej
-otwartoźródłowy port freeglut może dodawać nowe funkcjonalności, jednak musi
-zachowywać kompatybilność z oryginalną biblioteką, zatem w praktyce nie jest w
-stanie naprawić niektórych błędów GLUT.
-
-W związku z powyższym, zdecydowano się wykorzystać bibliotekę GLFW, która daje
-programiście większą kontrolę nad aplikacją, zapewnia więcej funkcjonalności,
-przykładowo:
+Zaimplementowano:
 
 \begin{itemize}
-    \item W GLFW programista sam tworzy główną pętlę programu, gdzie w GLUT
-          programista musi wywołać funkcję glutMainLoop która nigdy nie zwraca.
-
-    \item GLFW zapewnia dostęp do ``surowych'' danych poruszeń myszą, tj.
-          nieprzeskalowanych i niezakcelerowanych zgodnie z ustawieniami
-          akceleracji kursora myszy. Jendakże przede wszystkim poruszenia myszką
-          wzdłuż obu osi są udostępniane jako liczba zmiennoprzecinkowa, dzięki
-          czemu poruszenia kamerą nie będą ``skokowe''.
+      \item Realistyczny system oświetlenia przez oświetlanie i cieniowanie
+            Phonga
+      \item Intuicyjne sterowanie kamerą
+      \item Poruszanie planetami wg. ich orbit dookoła słońca, które dla
+            uproszczenia w programie są idealnymi okręgami
+      \item Kontrolę czasu by przyśpieszać lub spowalniać obieg planet.
 \end{itemize}
 
+Nie zaimplementowano:
+
+Symulowane są tylko główne planety systemu słonecznego, bez ich naturalnych
+satelitów. Skala wielkości planet oraz odległości między nimi nie są
+realistyczne i zostały wybrane arbitralnie by zagwarantować poglądowość modelu.
+Model symuluje rotację planet wokół słońca, wokół własnej osi Y, jednak nie mają
+inklinacji orbity (wszystkie poruszają się na tej samej powierzchni) ani
+pochylenia osiowego, rotacja wokół własnej osi wszystkich planet jest w tym
+samym kierunku.
+
+\section{Kod programu}
+
+\inputminted[breaklines]{C}{../main.cpp}
+
+\section{Podsumowanie}
+
+Wykonany program skupił w sobie techniki poznane w trakcie kursu Grafika
+Komputerowa. Wykonany model systemu słonecznego zawiera jednak wiele uproszczeń.
 
 \end{document}

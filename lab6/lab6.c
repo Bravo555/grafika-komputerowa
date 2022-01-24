@@ -43,6 +43,8 @@ static int delta_y = 0;
 
 float R = 10.0;
 
+int currTex = 0;
+
 // Funkcja "bada" stan myszy i ustawia wartości odpowiednich zmiennych globalnych
 void mousePressed(int btn, int state, int x, int y) {
     x_pos_old=x;        // przypisanie aktualnie odczytanej pozycji kursora
@@ -231,7 +233,7 @@ void drawVertexWithNormal(int u, int v) {
 
 void drawVertexTextured(int u, int v) {
     glNormal3fv(normals[u][v]);
-    glTexCoord2f((float)v / (N-1), (float)u / (N-1));
+    glMultiTexCoord2f(GL_TEXTURE0 + currTex, (float)v / (N-1), (float)u / (N-1));
     glVertex3fv(points[u][v]);
 }
 
@@ -578,6 +580,8 @@ void renderScene(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glDisable(GL_LIGHTING);
 
+    // glActiveTexture(GL_TEXTURE0 + currTex);
+
     glLoadIdentity();
     float currentPosition[4] = {0.0, 0.0, 0.0, 1.0};
 
@@ -652,6 +656,15 @@ void keyPressed(unsigned char key, int x, int y) {
     case 'c': model = 5; break;
     case 'v': model = 6; break;
 
+    case 'z':
+        currTex -= 1;
+        printf("%d\n", currTex);
+        break;
+    case 'x':
+        currTex += 1;
+        printf("%d\n", currTex);
+        break;
+
     case 'n': drawNormals = !drawNormals;
 
     default:
@@ -664,6 +677,7 @@ void keyPressed(unsigned char key, int x, int y) {
 void init() {
     GLint ImWidth, ImHeight, ImComponents;
     GLenum ImFormat;
+    glActiveTexture(GL_TEXTURE0);
     GLbyte* texture = LoadTGAImage("tekstury/P4_t.tga", &ImWidth, &ImHeight, &ImComponents, &ImFormat);
     glTexImage2D(GL_TEXTURE_2D, 0, ImComponents, ImWidth, ImHeight, 0, ImFormat, GL_UNSIGNED_BYTE, texture);
     glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
