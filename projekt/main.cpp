@@ -1,8 +1,12 @@
 #include <cstdio>
 #include <cmath>
 #include <vector>
+#include <iostream>
+#include <chrono>
+#include <cstdint>
 #include <GL/gl.h>
 #include <GL/glut.h>
+
 
 #include "texture.cpp"
 
@@ -11,12 +15,27 @@ const float EPSILON = 0.000001;
 typedef float point3[3];
 typedef float angles[3];
 
+float angle = 90.0f;
+
+const double DAYS_PER_YEAR = 365.0;
+const double SECONDS_IN_MINUTE = 60.0;
+
+// simulated days per real-time second
+double timeScale = DAYS_PER_YEAR / SECONDS_IN_MINUTE;
+double simCurrentDay = 0.0;
+
 struct Planet {
-    point3 position;
+    float distance;
+    int orbPeriodDays;
     float color[4];
     float size;
-    bool texture;
+    GLbyte* texture;
+    point3 position;
 };
+
+float lightPos[4] = {0.0, 0.0, 0.0, 1.0};
+
+int focusedBodyIndex = 0;
 
 std::vector<Planet> planets;
 
@@ -37,6 +56,15 @@ static int delta_x = 0;
 static int delta_y = 0;
 angles viewerAngles = {0.0, 0.5 * M_PI, 2.0};
 
+int width, height, components;
+GLenum format;
+GLbyte* sunTex;
+GLbyte* merTex;
+GLbyte* venTex;
+GLbyte* earTex;
+
+std::chrono::_V2::steady_clock::time_point lastTime;
+
 float clamp(float d, float min, float max) {
     const float t = d < min ? min : d;
     return t > max ? max : t;
@@ -49,6 +77,18 @@ float fmodfp(float a, float b) {
         a -= b;
     }
     return a;
+}
+
+// calculates a planet position from its distance from the sun, orbital period,
+// and current time
+void positionFromTime(float distance, float orbPeriod, point3 position) {
+    double planetOrbPos = (simCurrentDay / orbPeriod);
+
+    float x = distance * sin(planetOrbPos * M_PI);
+    float z = distance * cos(planetOrbPos * M_PI);
+
+    position[0] = x;
+    position[2] = z;
 }
 
 void angles_to_coords(float* angles, point3 coords) {
@@ -99,9 +139,6 @@ void mouseMoved(GLsizei x, GLsizei y) {
     else if(status == 2) {
         viewerAngles[2] = clamp(viewerAngles[2] + delta_y * zstep, 0.01, 100.0);
     }
-
-    // przerysowanie obrazu sceny
-    glutPostRedisplay();
 }
 
 // Funkcja rysująca osie układu współrzędnych
@@ -137,48 +174,87 @@ void glTranslatefv(float arr[]) {
     return glTranslatef(arr[0], arr[1], arr[2]);
 }
 
-void renderScene(void) {
+void setTexture(GLbyte* tex) {
+    glActiveTexture(GL_TEXTURE1);
+    glTexImage2D(GL_TEXTURE_2D, 0, components, width, height, 0, format, GL_UNSIGNED_BYTE, tex);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+}
+
+// a gluLookAt wrapper that takes arguments as structs
+void lookAtp3(point3 viewer, point3 center, point3 up) {
+    gluLookAt(viewer[0], viewer[1], viewer[2], center[0], center[1], center[2], up[0], up[1], up[2]);
+}
+
+void renderScene() {
+    // update simulation timestep
+    auto currentTime = std::chrono::steady_clock::now();
+    uint64_t timeElapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastTime).count();
+    lastTime = currentTime;
+
+    double timeElapsedS = (double)timeElapsedMs / 1000.0;
+    double simDaysElapsed = timeScale * timeElapsedS;
+    simCurrentDay += simDaysElapsed;
+
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glDisable(GL_LIGHTING);
+    GLUquadric* quadric = gluNewQuadric();
 
-    float sun_pos[] = {0.0, 0.0, 0.0, 1.0};
-    float sun_color[] = {1.0, 1.0, 0.0, 1.0};
-    float sun_size = 0.5;
+    for(auto& planet: planets) {
+        positionFromTime(planet.distance, planet.orbPeriodDays, planet.position);
+    }
 
-    float viewer_pos[4] = {0.0, 0.0, 0.0, 1.0};
-    angles_to_coords(viewerAngles, viewer_pos);
+    float* focusedPlanet = planets[focusedBodyIndex].position;
 
-    gluLookAt(viewer_pos[0], viewer_pos[1], viewer_pos[2], 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-    axes();
+    float viewerPos[4] = {0.0, 0.0, 0.0, 1.0};
+    point3 up = {0.0, 1.0, 0.0};
+
+    angles_to_coords(viewerAngles, viewerPos);
+    viewerPos[0] += focusedPlanet[0];
+    viewerPos[1] += focusedPlanet[1];
+    viewerPos[2] += focusedPlanet[2];
 
     glLoadIdentity();
-    gluLookAt(viewer_pos[0], viewer_pos[1], viewer_pos[2], 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-    glColor4fv(sun_color);
-    glutSolidSphere(sun_size, 100, 100);
+    lookAtp3(viewerPos, focusedPlanet, up);
 
+    axes();
 
     glEnable(GL_LIGHTING);
-    glLightfv(GL_LIGHT0, GL_POSITION, sun_pos);
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
     for(auto& planet: planets) {
         glDisable(GL_TEXTURE_2D);
         glLoadIdentity();
-        gluLookAt(viewer_pos[0], viewer_pos[1], viewer_pos[2], 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-        glTranslatefv(planet.position);
-        glMaterialfv(GL_FRONT, GL_DIFFUSE, planet.color);
+        lookAtp3(viewerPos, focusedPlanet, up);
 
-        GLUquadric* quadric = gluNewQuadric();
+        glTranslatefv(planet.position);
+
+        if(planet.distance == 0.0) {
+            glDisable(GL_LIGHTING);
+            glColor4fv(planet.color);
+        }
+
+
         if(planet.texture) {
             glEnable(GL_TEXTURE_2D);
+            setTexture(planet.texture);
+            glRotatef(angle, 1.0f, 0.0f, 0.0f);
             gluQuadricTexture(quadric, true);
+            glDisable(GL_TEXTURE_2D);
         }
 
         gluSphere(quadric, planet.size, 100, 100);
+        gluQuadricTexture(quadric, false);
+        glEnable(GL_LIGHTING);
     }
+
 
     glFlush();
     glutSwapBuffers();
+
+    glutPostRedisplay();
 }
 
 void changeSize(int horizontal, int vertical) {
@@ -198,6 +274,34 @@ void changeSize(int horizontal, int vertical) {
 }
 
 void keyPressed(unsigned char key, int x, int y) {
+    switch(key) {
+    case 'q':
+        angle -= 1.0f;
+        std::cout << angle << std::endl;
+        break;
+    case 'e':
+        angle += 1.0f;
+        std::cout << angle << std::endl;
+        break;
+
+    case 'p':
+        timeScale *= 2.0;
+        break;
+    case 'l':
+        timeScale /= 2.0;
+        break;
+
+    case 'x':
+        focusedBodyIndex = (focusedBodyIndex + 1) % planets.size();
+        std::cout << focusedBodyIndex << std::endl;
+        break;
+    case 'z':
+        focusedBodyIndex -= 1;
+        if(focusedBodyIndex < 0) focusedBodyIndex = planets.size() - 1;
+        std::cout << focusedBodyIndex << std::endl;
+        break;
+    }
+    glutPostRedisplay();
 }
 
 void init() {
@@ -252,53 +356,95 @@ void init() {
     glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
     glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
 
-    float pos[4] = {0.0, 0.0, 0.0, 1.0};
-    glLightfv(GL_LIGHT0, GL_POSITION, pos);
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
 
     glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, att_constant);
     glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, att_linear);
     glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, att_quadratic);
 
-    int width, height, components;
-    GLenum format;
-    GLbyte* tex = LoadTGAImage("textures/earth.tga", &width, &height, &components, &format);
-    glTexImage2D(GL_TEXTURE_2D, 0, components, width, height, 0, format, GL_UNSIGNED_BYTE, tex);
-    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    free(tex);
-
     planets = {
+        // sun
+        {
+            0.0,
+            1,
+            {1.0, 1.0, 1.0, 1.0},
+            0.5,
+            LoadTGAImage("textures/sun_f.tga", &width, &height, &components, &format)
+        },
+
         // mercury
         {
-            {0.7, 0.0, 0.0},
+            0.7,
+            115,
             {0.2, 0.2, 0.2, 1.0},
-            0.048
+            0.048,
+            LoadTGAImage("textures/mercury_f.tga", &width, &height, &components, &format)
         },
 
         // venus
         {
-            {1.1, 0.0, 0.0},
+            1.1,
+            224,
             {0.8, 0.8, 0.8, 1.0},
-            0.060
+            0.060,
+            LoadTGAImage("textures/venus_f.tga", &width, &height, &components, &format)
         },
 
         // earth
         {
-            {1.5, 0.0, 0.0},
+            1.5,
+            365,
             {0.0, 0.0, 1.0, 1.0},
             0.064,
-            true
+            LoadTGAImage("textures/earth_f.tga", &width, &height, &components, &format)
         },
 
         // mars
         {
-            {2.2, 0.0, 0.0},
+            2.2,
+            779,
             {0.6, 0.2, 0.0, 1.0},
-            0.034
+            0.034,
+            LoadTGAImage("textures/mars_f.tga", &width, &height, &components, &format)
         },
-    };
 
+        // jupiter
+        {
+            3.2,
+            1000,
+            {1.0, 1.0, 1.0, 1.0},
+            0.1,
+            LoadTGAImage("textures/jupiter_f.tga", &width, &height, &components, &format)
+        },
+
+        // saturn
+        {
+            4.2,
+            1200,
+            {1.0, 1.0, 1.0, 1.0},
+            0.1,
+            LoadTGAImage("textures/saturn_f.tga", &width, &height, &components, &format)
+        },
+
+        // uranus
+        {
+            5.2,
+            1400,
+            {1.0, 1.0, 1.0, 1.0},
+            0.1,
+            LoadTGAImage("textures/uranus_f.tga", &width, &height, &components, &format)
+        },
+
+        // neptune
+        {
+            6.2,
+            1600,
+            {1.0, 1.0, 1.0, 1.0},
+            0.1,
+            LoadTGAImage("textures/neptune_f.tga", &width, &height, &components, &format)
+        },
+
+    };
 
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
@@ -319,6 +465,8 @@ int main(int argc, char** argv) {
     glutKeyboardFunc(keyPressed);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+    lastTime = std::chrono::steady_clock::now();
     glutMainLoop();
 
     return 0;
